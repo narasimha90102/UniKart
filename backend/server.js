@@ -124,10 +124,22 @@ app.post("/send-otp", async (req, res) => {
 
 
 
-// Root route
-app.get('/', (req, res) => {
-  res.send('UniKart API is running...');
-});
+// Serve frontend in production
+if (process.env.NODE_ENV === 'production') {
+  const path = require('path');
+  app.use(express.static(path.join(__dirname, '../frontend/dist')));
+
+  app.get('*', (req, res) =>
+    res.sendFile(
+      path.resolve(__dirname, '../', 'frontend', 'dist', 'index.html')
+    )
+  );
+} else {
+  // Root route for development
+  app.get('/', (req, res) => {
+    res.send('UniKart API is running...');
+  });
+}
 
 // Error Handling Middleware
 app.use(errorHandler);
