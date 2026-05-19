@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  // In dev, Vite proxies /api → http://localhost:5000/api (no CORS issues)
-  baseURL: import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5000/api'),
+  // In dev, Vite proxies /api → http://localhost:5000/api
+  baseURL: import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || '/api'),
   headers: {
     'Content-Type': 'application/json',
   },
@@ -25,7 +25,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    // Only redirect to login if the error is 401 AND we are NOT currently trying to log in
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
       // Clear session data if token is invalid or expired
       localStorage.removeItem('unikart_token');
       localStorage.removeItem('unikart_user');

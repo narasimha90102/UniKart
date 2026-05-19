@@ -3,7 +3,7 @@ const errorHandler = (err, req, res, next) => {
   error.message = err.message;
 
   // Log to console for dev
-  console.error(err.stack);
+  console.error('[Error Middleware] Caught error:', err.stack || err);
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
@@ -13,18 +13,20 @@ const errorHandler = (err, req, res, next) => {
 
   // Mongoose duplicate key
   if (err.code === 11000) {
-    const message = 'Duplicate field value entered';
+    const field = Object.keys(err.keyValue || {})[0] || 'field';
+    const message = `A record with this ${field} already exists.`;
     error = { message, statusCode: 400 };
   }
 
   // Mongoose validation error
   if (err.name === 'ValidationError') {
-    const message = Object.values(err.errors).map((val) => val.message);
+    const message = Object.values(err.errors).map((val) => val.message).join(', ');
     error = { message, statusCode: 400 };
   }
 
   res.status(error.statusCode || 500).json({
     success: false,
+    message: error.message || 'Server Error',
     error: error.message || 'Server Error'
   });
 };

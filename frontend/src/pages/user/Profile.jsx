@@ -27,8 +27,40 @@ export function Profile() {
     name: user?.name || '',
     email: user?.email || '',
     phone: user?.phoneNumber || '',
-    department: user?.college || ''
+    department: user?.college || '',
+    bio: user?.bio || '',
+    avatar: user?.avatar || ''
   });
+
+  // Sync state if user context updates
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        name: user.name || '',
+        email: user.email || '',
+        phone: user.phoneNumber || '',
+        department: user.college || '',
+        bio: user.bio || '',
+        avatar: user.avatar || ''
+      });
+    }
+  }, [user]);
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    if (file.size > 2 * 1024 * 1024) {
+      alert('Avatar image size must be less than 2MB');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, avatar: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -51,13 +83,16 @@ export function Profile() {
 
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!formData.name.trim()) return setSaveError('Name cannot be empty.');
     setIsSaving(true);
     setSaveError('');
     try {
       const res = await api.put('/users/profile', {
         name: formData.name,
         phoneNumber: formData.phone,
-        college: isAdmin ? undefined : formData.department
+        college: isAdmin ? undefined : formData.department,
+        bio: formData.bio,
+        avatar: formData.avatar
       });
       const updatedUser = { ...user, ...res.data.data };
       setUser(updatedUser);
@@ -121,13 +156,13 @@ export function Profile() {
           <div className="flex flex-col items-center gap-6 mb-10">
             <div className="relative group">
               <img 
-                src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=1B8C50&color=fff&size=200`} 
+                src={formData.avatar || user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=1B8C50&color=fff&size=200`} 
                 alt="User" 
                 className="w-32 h-32 rounded-[2.5rem] object-cover ring-4 ring-primary/5 transition-all group-hover:brightness-90" 
               />
               <label className="absolute bottom-0 right-0 p-2.5 bg-primary text-white rounded-2xl shadow-lg cursor-pointer hover:scale-110 transition-transform">
                 <Camera className="w-5 h-5" />
-                <input type="file" className="hidden" accept="image/*" />
+                <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
               </label>
             </div>
             <div className="text-center">
@@ -164,6 +199,17 @@ export function Profile() {
                 />
               </div>
             )}
+
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Short Bio</label>
+              <textarea
+                value={formData.bio}
+                onChange={e => setFormData({...formData, bio: e.target.value})}
+                placeholder="Tell other students a bit about yourself..."
+                rows={3}
+                className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all resize-none"
+              />
+            </div>
             
             {saveError && <p className="text-xs font-bold text-red-500 bg-red-50 p-4 rounded-xl border border-red-100">{saveError}</p>}
             
@@ -243,6 +289,12 @@ export function Profile() {
               <p className="text-base font-black text-gray-900">{user?.college || 'Not set'}</p>
             </div>
           </div>
+          {user?.bio && (
+            <div className="mt-6 p-5 bg-gray-50 rounded-3xl border border-gray-100">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Short Bio</p>
+              <p className="text-sm font-semibold text-gray-700 leading-relaxed">{user.bio}</p>
+            </div>
+          )}
         </div>
 
         <div className="pt-8 border-t border-gray-50">

@@ -48,7 +48,7 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Enable CORS for all origins in development
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:3000'],
+  origin: '*', // Allow all origins for development (Vite binds to network IP usually)
   credentials: false
 }));
 
@@ -67,60 +67,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
-
-app.post("/send-otp", async (req, res) => {
-  try {
-    const { email } = req.body;
-    const User = require('./models/User');
-
-    // Find user
-    const user = await User.findOne({ email });
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    // Save to DB
-    user.otp = otp;
-    user.otpExpire = otpExpire;
-    await user.save();
-
-    await resend.emails.send({
-      from: "onboarding@resend.dev",
-      to: email,
-      subject: "UniKart OTP Verification",
-      html: `
-        <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 500px; margin: auto; border: 1px solid #eee; border-radius: 12px;">
-          <h2 style="color: #1B8C50; text-align: center;">UniKart Verification</h2>
-          <p>Hello,</p>
-          <p>Your student verification code is:</p>
-          <div style="background: #f9f9f9; padding: 20px; font-size: 32px; font-weight: 900; letter-spacing: 10px; text-align: center; border-radius: 8px; color: #1B8C50; margin: 20px 0;">
-            ${otp}
-          </div>
-          <p style="font-size: 12px; color: #666; text-align: center;">This code will expire in 10 minutes.</p>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 11px; color: #999; text-align: center;">If you didn't request this, please ignore this email.</p>
-        </div>
-      `,
-    });
-
-    res.json({
-      success: true,
-      message: process.env.NODE_ENV === 'development' 
-        ? `OTP sent successfully (Dev Mode: Use ${otp})` 
-        : "OTP sent successfully",
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
-    });
-  } catch (error) {
-    console.error('OTP Error:', error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to send OTP",
-    });
-  }
-});
+app.use('/api/support', require('./routes/supportRoutes'));
 
 
 

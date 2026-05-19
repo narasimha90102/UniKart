@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, ArrowRight, Eye, EyeOff, ShieldAlert } from 'lucide-react';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Mail, Lock, ArrowRight, Eye, EyeOff, ShieldAlert, CheckCircle2 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
 
 export function Login() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { login, setUser } = useAuth();
   const [email, setEmail] = useState(localStorage.getItem('unikart_remembered_email') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(!!localStorage.getItem('unikart_remembered_email'));
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState(location.state?.message || '');
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
     setLoading(true);
     try {
       const userData = await login(email, password);
@@ -50,6 +53,7 @@ export function Login() {
         name: `User via ${provider}`,
         email: `user@${provider.toLowerCase()}.com`,
         role: 'user',
+        status: 'approved',
         wishlist: [],
         createdAt: new Date().toISOString()
       };
@@ -61,12 +65,23 @@ export function Login() {
     }, 1000);
   };
 
+  const isEmailInvalid = error && (
+    error.toLowerCase().includes('email') || 
+    error.toLowerCase().includes('exist') || 
+    error.toLowerCase().includes('does not')
+  );
+  
+  const isPasswordInvalid = error && (
+    error.toLowerCase().includes('password') || 
+    error.toLowerCase().includes('incorrect')
+  );
+
   return (
     <div className="min-h-[80vh] flex items-center justify-center px-4 sm:px-6 lg:px-8 bg-gray-50/50 py-12">
       <motion.div
         initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.3 }}
+        animate={error ? { x: [0, -10, 10, -10, 10, 0], opacity: 1, scale: 1 } : { opacity: 1, scale: 1 }}
+        transition={{ duration: 0.4 }}
         className="max-w-md w-full space-y-6 bg-white pt-0 px-8 pb-8 md:px-10 md:pb-10 rounded-3xl shadow-xl border border-gray-100"
       >
         <div>
@@ -85,14 +100,26 @@ export function Login() {
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleLogin}>
+          {successMsg && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-4 rounded-2xl text-sm font-bold border bg-emerald-50 text-emerald-700 border-emerald-100"
+            >
+              <div className="flex items-center gap-3">
+                <CheckCircle2 className="w-5 h-5 shrink-0" />
+                <p>{successMsg}</p>
+              </div>
+            </motion.div>
+          )}
           {error && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
               className={`p-4 rounded-2xl text-sm font-bold border ${
-                error.includes('waiting') || error.includes('verify') 
+                error.toLowerCase().includes('waiting') || error.toLowerCase().includes('pending') 
                   ? 'bg-amber-50 text-amber-700 border-amber-100' 
-                  : error.includes('rejected')
+                  : error.toLowerCase().includes('disabled') || error.toLowerCase().includes('rejected') || error.toLowerCase().includes('suspended')
                   ? 'bg-red-50 text-red-700 border-red-100'
                   : 'bg-red-50 text-red-600 border-red-100'
               }`}
@@ -105,7 +132,7 @@ export function Login() {
           )}
           <div className="space-y-4">
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isEmailInvalid ? 'text-red-400' : 'text-gray-400'}`} />
               <Input
                 id="email-address"
                 name="email"
@@ -114,12 +141,16 @@ export function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="pl-11 h-12 text-base rounded-xl bg-gray-50 border-gray-200 focus:bg-white"
+                className={`pl-11 h-12 text-base rounded-xl transition-all ${
+                  isEmailInvalid 
+                    ? 'border-red-500 bg-red-50/10 focus:border-red-500 focus:ring-red-200 focus:bg-white' 
+                    : 'bg-gray-50 border-gray-200 focus:bg-white'
+                }`}
                 placeholder="Email (.edu or student email)"
               />
             </div>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${isPasswordInvalid ? 'text-red-400' : 'text-gray-400'}`} />
               <Input
                 id="password"
                 name="password"
@@ -128,7 +159,11 @@ export function Login() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="pl-11 pr-11 h-12 text-base rounded-xl bg-gray-50 border-gray-200 focus:bg-white"
+                className={`pl-11 pr-11 h-12 text-base rounded-xl transition-all ${
+                  isPasswordInvalid 
+                    ? 'border-red-500 bg-red-50/10 focus:border-red-500 focus:ring-red-200 focus:bg-white' 
+                    : 'bg-gray-50 border-gray-200 focus:bg-white'
+                }`}
                 placeholder="Password"
               />
               <button 
@@ -166,10 +201,22 @@ export function Login() {
           <Button 
             type="submit" 
             size="lg" 
-            className="w-full rounded-xl text-base h-12 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20"
+            className="w-full rounded-xl text-base h-12 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 flex items-center justify-center gap-2"
             disabled={loading}
           >
-            {loading ? 'Signing in...' : 'Sign in'} <ArrowRight className="ml-2 w-5 h-5" />
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Verifying...
+              </>
+            ) : (
+              <>
+                Sign in <ArrowRight className="ml-2 w-5 h-5" />
+              </>
+            )}
           </Button>
           
           <div className="mt-6">

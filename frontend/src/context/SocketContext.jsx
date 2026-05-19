@@ -6,7 +6,7 @@ const SocketContext = createContext();
 
 const SOCKET_URL = import.meta.env.DEV
   ? window.location.origin
-  : (import.meta.env.VITE_SOCKET_URL || 'http://localhost:5000');
+  : (import.meta.env.VITE_SOCKET_URL || window.location.origin);
 
 export function SocketProvider({ children }) {
   const [socket, setSocket] = useState(null);
@@ -92,10 +92,10 @@ export function SocketProvider({ children }) {
     };
   }, [user?._id || user?.id]);
 
-  const value = React.useMemo(() => ({ 
-    socket, 
-    onlineUsers, 
-    lastSeenMap 
+  const value = React.useMemo(() => ({
+    socket,
+    onlineUsers,
+    lastSeenMap
   }), [socket, onlineUsers, lastSeenMap]);
 
   return (

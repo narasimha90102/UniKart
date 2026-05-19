@@ -26,10 +26,11 @@ exports.getConversations = async (req, res, next) => {
       if (!contactsMap.has(otherUserId)) {
         const otherUser = await User.findById(otherUserId).select('name avatar lastSeen');
         if (otherUser) {
+          const hasCustomAvatar = otherUser.avatar && otherUser.avatar !== 'default-avatar.png';
           contactsMap.set(otherUserId, {
             id: otherUserId,
             sender: otherUser.name,
-            avatar: otherUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.name)}&background=1B8C50&color=fff`,
+            avatar: hasCustomAvatar ? otherUser.avatar : `https://ui-avatars.com/api/?name=${encodeURIComponent(otherUser.name)}&background=1B8C50&color=fff`,
             lastMessage: msg.content || 'Image attached',
             time: msg.createdAt,
             unread: msg.receiver.toString() === userId && !msg.read ? 1 : 0,

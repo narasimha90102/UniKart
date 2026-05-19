@@ -10,6 +10,13 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../utils/api';
 import { useNotifications } from '../../context/NotificationContext';
 
+const getAvatarUrl = (avatar, name = 'User') => {
+  if (!avatar || avatar === 'default-avatar.png') {
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=1B8C50&color=fff`;
+  }
+  return avatar;
+};
+
 export function Chat() {
   const location = useLocation();
   const { socket, onlineUsers, lastSeenMap } = useSocket();
@@ -78,7 +85,7 @@ export function Chat() {
         } : {
           id: otherPersonId,
           sender: isFromMe ? (msg.receiverName || 'User') : (msg.senderName || 'New User'),
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.senderName || 'U')}&background=1B8C50&color=fff`,
+          avatar: getAvatarUrl(null, msg.senderName || 'U'),
           lastMessage: msg.content || 'Image',
           time: new Date().toISOString(),
           unread: isFromMe ? 0 : 1
@@ -127,7 +134,7 @@ export function Chat() {
             const newContact = {
               id: sellerId,
               sender: location.state.sellerName || 'Seller',
-              avatar: location.state.sellerAvatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(location.state.sellerName || 'S')}&background=1B8C50&color=fff`,
+              avatar: getAvatarUrl(location.state.sellerAvatar, location.state.sellerName || 'S'),
               lastMessage: location.state.productTitle ? `Item: ${location.state.productTitle}` : 'Start a conversation',
               time: new Date().toISOString(),
               unread: 0
@@ -364,7 +371,7 @@ export function Chat() {
     const newContact = { 
       id: String(selectedUser._id), 
       sender: selectedUser.name, 
-      avatar: selectedUser.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&background=1B8C50&color=fff`, 
+      avatar: getAvatarUrl(selectedUser.avatar, selectedUser.name), 
       lastMessage: 'Say hi!', 
       time: new Date().toISOString(),
       unread: 0
@@ -452,7 +459,7 @@ export function Chat() {
                     className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${activeChat?.id === c.id ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]' : 'hover:bg-gray-50'}`}
                   >
                     <div className="relative shrink-0">
-                      <img src={c.avatar} className="w-12 h-12 rounded-2xl object-cover shadow-sm" />
+                      <img src={getAvatarUrl(c.avatar, c.sender)} className="w-12 h-12 rounded-2xl object-cover shadow-sm" />
                       {isOnline && <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -486,7 +493,7 @@ export function Chat() {
               <div className="flex items-center gap-3 md:gap-4">
                 <button onClick={() => setActiveChat(null)} className="md:hidden p-2 -ml-2 text-gray-400 hover:text-primary transition-colors"><ArrowLeft className="w-5 h-5" /></button>
                 <div className="relative">
-                  <img src={activeChat.avatar} className="w-10 h-10 md:w-12 md:h-12 rounded-2xl object-cover shadow-sm" />
+                  <img src={getAvatarUrl(activeChat.avatar, activeChat.sender)} className="w-10 h-10 md:w-12 md:h-12 rounded-2xl object-cover shadow-sm" />
                   {onlineUsers.has(String(activeChat.id)) && <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />}
                 </div>
                 <div>
@@ -670,7 +677,7 @@ export function Chat() {
                     onClick={() => startNewChat(u)} 
                     className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-100 transition-all"
                   >
-                    <img src={u.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=1B8C50&color=fff`} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                    <img src={getAvatarUrl(u.avatar, u.name)} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
                     <div>
                       <p className="text-sm font-black text-gray-900">{u.name}</p>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{u.college || 'UniKart Verified'}</p>

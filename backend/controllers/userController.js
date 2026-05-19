@@ -131,12 +131,14 @@ exports.getCart = async (req, res, next) => {
 // @access  Private
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, phoneNumber, college } = req.body;
+    const { name, phoneNumber, college, bio, avatar } = req.body;
     const user = await User.findById(req.user.id);
 
     if (name) user.name = name;
-    if (phoneNumber) user.phoneNumber = phoneNumber;
+    if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
     if (college) user.college = college;
+    if (bio !== undefined) user.bio = bio;
+    if (avatar) user.avatar = avatar;
 
     await user.save();
     res.json({ success: true, data: user });
@@ -161,6 +163,75 @@ exports.updatePassword = async (req, res, next) => {
     await user.save();
 
     res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update privacy preferences
+// @route   PUT /api/users/privacy
+// @access  Private
+exports.updatePrivacy = async (req, res, next) => {
+  try {
+    const { privacy } = req.body;
+    const user = await User.findById(req.user.id);
+    user.privacy = { ...(user.privacy || {}), ...privacy };
+    await user.save();
+    res.json({ success: true, data: user.privacy });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update notification preferences
+// @route   PUT /api/users/notifications
+// @access  Private
+exports.updateNotificationPrefs = async (req, res, next) => {
+  try {
+    const { notifPrefs } = req.body;
+    const user = await User.findById(req.user.id);
+    user.notifPrefs = { ...(user.notifPrefs || {}), ...notifPrefs };
+    await user.save();
+    res.json({ success: true, data: user.notifPrefs });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get login activity (mocked for now; extend with a LoginLog model later)
+// @route   GET /api/users/login-activity
+// @access  Private
+exports.getLoginActivity = async (req, res, next) => {
+  try {
+    // In a full implementation this would query a LoginLog collection.
+    // For now return the last login timestamp stored on the user.
+    const user = await User.findById(req.user.id);
+    res.json({
+      success: true,
+      data: [
+        {
+          device: 'Web Browser',
+          location: 'Unknown',
+          time: user.lastLogin || new Date(),
+          isCurrent: true,
+          success: true,
+        },
+      ],
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Deactivate / soft-delete account
+// @route   DELETE /api/users/deactivate
+// @access  Private
+exports.deactivateAccount = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    user.status = 'suspended';
+    await user.save();
+    res.json({ success: true, message: 'Account deactivated successfully.' });
   } catch (error) {
     next(error);
   }

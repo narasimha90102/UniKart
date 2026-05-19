@@ -4,6 +4,7 @@ import { AuthProvider } from './context/AuthContext';
 import { SocketProvider } from './context/SocketContext';
 import { CartProvider } from './context/CartContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { Home } from './pages/main/Home';
 import { ProductDetails } from './pages/main/ProductDetails';
@@ -11,7 +12,7 @@ import { Sell } from './pages/main/Sell';
 import { SellerProfile } from './pages/main/SellerProfile';
 import { Login } from './pages/auth/Login';
 import { Signup } from './pages/auth/Signup';
-import { VerifyOTP } from './pages/auth/VerifyOTP';
+
 import { ForgotPassword } from './pages/auth/ForgotPassword';
 import { ResetPassword } from './pages/auth/ResetPassword';
 import { DashboardLayout, DashboardOverview, Wishlist, Payments } from './pages/user/Dashboard';
@@ -30,6 +31,7 @@ import { AdminRoute } from './components/auth/AdminRoute';
 
 function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <SocketProvider>
         <NotificationProvider>
@@ -45,7 +47,7 @@ function App() {
                   <Route path="sell" element={<Sell />} />
                   <Route path="login" element={<Login />} />
                   <Route path="signup" element={<Signup />} />
-                  <Route path="verify-otp" element={<VerifyOTP />} />
+
                   <Route path="forgot-password" element={<ForgotPassword />} />
                   <Route path="reset-password/:token" element={<ResetPassword />} />
                   
@@ -77,6 +79,7 @@ function App() {
         </NotificationProvider>
       </SocketProvider>
     </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -33,10 +33,18 @@ export function AdminPanel() {
   const [categoryName, setCategoryName] = useState('');
   const [isUserModalOpen, setIsUserModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
-  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', status: 'active' });
+  const [userForm, setUserForm] = useState({ name: '', email: '', password: '', role: 'user', status: 'approved', regNo: '', college: '', department: '' });
   const [isProductModalOpen, setIsProductModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productForm, setProductForm] = useState({ title: '', price: '', category: '', status: 'active', images: '' });
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 5000);
+  };
 
   const fetchData = async () => {
     setLoading(true);
@@ -66,22 +74,37 @@ export function AdminPanel() {
 
   useEffect(() => {
     fetchData();
+
+    // Auto-sync database listings and dashboard stats every 30 seconds
+    const syncInterval = setInterval(() => {
+      console.log('[AdminPanel] Auto-syncing database hub...');
+      fetchData();
+    }, 30000);
+
+    return () => clearInterval(syncInterval);
   }, []);
 
   const handleUserSubmit = async (e) => {
     e.preventDefault();
+    console.log('[AdminPanel] Submitting user form:', userForm);
     try {
       if (editingUser) {
         const res = await api.put(`/admin/users/${editingUser._id}`, userForm);
+        console.log('[AdminPanel] User updated successfully:', res.data);
         setUsers(users.map(u => u._id === editingUser._id ? res.data.data : u));
+        showToast('System user updated successfully.', 'success');
       } else {
         const res = await api.post('/admin/users', userForm);
+        console.log('[AdminPanel] User created successfully:', res.data);
         setUsers([res.data.data, ...users]);
+        showToast('System user created successfully in Database.', 'success');
       }
       setIsUserModalOpen(false);
       setEditingUser(null);
     } catch (err) { 
-      alert(err.response?.data?.message || 'Operation failed'); 
+      console.error('[AdminPanel] Form submission failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Operation failed';
+      showToast(errMsg, 'error');
     }
   };
 
@@ -90,7 +113,12 @@ export function AdminPanel() {
     try {
       await api.delete(`/admin/users/${id}`);
       setUsers(users.filter(u => u._id !== id));
-    } catch (err) { alert('Delete failed'); }
+      showToast('User and associated listings deleted successfully.', 'success');
+    } catch (err) { 
+      console.error('[AdminPanel] Delete user failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Delete failed';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleListingDelete = async (id) => {
@@ -98,7 +126,12 @@ export function AdminPanel() {
     try {
       await api.delete(`/products/${id}`);
       setListings(listings.filter(l => l._id !== id));
-    } catch (err) { alert('Delete failed'); }
+      showToast('Product listing removed successfully.', 'success');
+    } catch (err) { 
+      console.error('[AdminPanel] Delete listing failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Delete failed';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleProductSubmit = async (e) => {
@@ -106,7 +139,15 @@ export function AdminPanel() {
     try {
       if (editingProduct) {
         await api.put(`/products/${editingProduct._id}`, productForm);
-        setListings(listings.map(l => l._id === editingProduct._id ? { ...l, ...productForm } : l));
+        
+        // If the admin sets status to 'sold', remove it from active listings instantly
+        if (productForm.status === 'sold') {
+          setListings(listings.filter(l => l._id !== editingProduct._id));
+          showToast('Product marked as sold and removed from active overview.', 'success');
+        } else {
+          setListings(listings.map(l => l._id === editingProduct._id ? { ...l, ...productForm } : l));
+          showToast('Listing updated successfully.', 'success');
+        }
       } else {
         const res = await api.post('/products', {
           ...productForm,
@@ -115,10 +156,15 @@ export function AdminPanel() {
           condition: 'New'
         });
         setListings([res.data.data, ...listings]);
+        showToast('Listing created successfully.', 'success');
       }
       setIsProductModalOpen(false);
       setEditingProduct(null);
-    } catch (err) { alert('Operation failed'); }
+    } catch (err) { 
+      console.error('[AdminPanel] Product submit failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Operation failed';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleVerification = async (id, status) => {
@@ -126,10 +172,12 @@ export function AdminPanel() {
       const res = await api.put(`/admin/verifications/${id}`, { status });
       if (res.data.success) {
         setUsers(users.map(u => u._id === id ? res.data.data : u));
-        // Also update local list if we have separate filtered lists, but here we use the main users list
+        showToast(`User registration ${status} successfully.`, 'success');
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Verification update failed');
+      console.error('[AdminPanel] Verification failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Verification update failed';
+      showToast(errMsg, 'error');
     }
   };
 
@@ -141,7 +189,12 @@ export function AdminPanel() {
       ));
       setIsResponseModalOpen(false);
       setAdminResponse('');
-    } catch (err) { alert('Response failed'); }
+      showToast('Support desk reply dispatched successfully.', 'success');
+    } catch (err) { 
+      console.error('[AdminPanel] Support response failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Response failed';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleCategorySubmit = async (e) => {
@@ -151,7 +204,12 @@ export function AdminPanel() {
       setCategories([...categories, categoryName]);
       setIsCategoryModalOpen(false);
       setCategoryName('');
-    } catch (err) { alert('Category error'); }
+      showToast('Category created successfully.', 'success');
+    } catch (err) { 
+      console.error('[AdminPanel] Category submit failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Category error';
+      showToast(errMsg, 'error');
+    }
   };
 
   const handleCategoryDelete = async (name) => {
@@ -159,7 +217,12 @@ export function AdminPanel() {
     try {
       await api.delete(`/products/categories/${name}`);
       setCategories(categories.filter(c => c !== name));
-    } catch (err) { alert('Delete failed'); }
+      showToast('Category deleted successfully.', 'success');
+    } catch (err) { 
+      console.error('[AdminPanel] Category delete failed:', err);
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Delete failed';
+      showToast(errMsg, 'error');
+    }
   };
 
   if (loading && !lastSynced) return (
@@ -309,36 +372,68 @@ export function AdminPanel() {
                   {/* Listings Table */}
                   <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden shadow-sm">
                     <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
-                      <h2 className="font-black text-gray-800 flex items-center gap-2 text-xs uppercase tracking-widest"><ShoppingBag className="w-4 h-4" /> Marketplace Oversight</h2>
-                      <Button size="sm" className="rounded-xl px-5" onClick={() => { setEditingProduct(null); setProductForm({ title: '', price: '', category: categories[0] || 'Others', status: 'active', images: '' }); setIsProductModalOpen(true); }}>Create Listing</Button>
+                      <h2 className="font-black text-gray-800 flex items-center gap-2 text-xs uppercase tracking-widest">
+                        <ShoppingBag className="w-4 h-4" /> 
+                        Marketplace Oversight
+                        {loading && (
+                          <svg className="animate-spin h-3.5 w-3.5 text-primary ml-1.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                        )}
+                      </h2>
+                      <Button size="sm" className="rounded-xl px-5" onClick={() => { setEditingProduct(null); setProductForm({ title: '', price: '', category: categories[0] || 'Others', status: 'available', images: '' }); setIsProductModalOpen(true); }}>Create Listing</Button>
                     </div>
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-tighter">
                           <tr>
                             <th className="px-6 py-4 text-left">Product</th>
-                            <th className="px-6 py-4 text-left">Details</th>
+                            <th className="px-6 py-4 text-left">Price & Category</th>
+                            <th className="px-6 py-4 text-left">Seller</th>
+                            <th className="px-6 py-4 text-left">Date Added</th>
                             <th className="px-6 py-4 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {listings.map(item => (
-                            <tr key={item._id} className="hover:bg-gray-50/30 transition-colors">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <img src={item.images?.[0]} className="w-12 h-12 rounded-xl object-cover shadow-sm border border-gray-100" />
-                                  <p className="text-sm font-black text-gray-800">{item.title}</p>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-xs font-black text-emerald-600">₹{item.price} • <span className="text-gray-400 uppercase text-[10px]">{item.category}</span></td>
-                              <td className="px-6 py-4 text-right">
-                                <div className="flex justify-end gap-2">
-                                  <button onClick={() => { setEditingProduct(item); setProductForm({ title: item.title, price: item.price, category: item.category, status: item.status }); setIsProductModalOpen(true); }} className="p-2 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
-                                  <button onClick={() => handleListingDelete(item._id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                          {listings.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="px-6 py-12 text-center text-gray-400 font-bold">
+                                <div className="flex flex-col items-center justify-center gap-2 py-4">
+                                  <ShoppingBag className="w-8 h-8 text-gray-300" />
+                                  <p className="text-sm font-black text-gray-400 uppercase tracking-wider">No active marketplace items available</p>
                                 </div>
                               </td>
                             </tr>
-                          ))}
+                          ) : (
+                            listings.map(item => (
+                              <tr key={item._id} className="hover:bg-gray-50/30 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <img src={item.images?.[0]} className="w-12 h-12 rounded-xl object-cover shadow-sm border border-gray-100" />
+                                    <p className="text-sm font-black text-gray-800">{item.title}</p>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-black text-emerald-600">
+                                  ₹{item.price} • <span className="text-gray-400 uppercase text-[10px] mr-2">{item.category}</span>
+                                  <span className="bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-wider">Available</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <p className="text-xs font-black text-gray-800">{item.seller?.name || 'Unknown Seller'}</p>
+                                  <p className="text-[10px] font-bold text-gray-400">{item.seller?.email || 'N/A'}</p>
+                                </td>
+                                <td className="px-6 py-4 text-xs font-bold text-gray-500">
+                                  {item.createdAt ? new Date(item.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <div className="flex justify-end gap-2">
+                                    <button onClick={() => { setEditingProduct(item); setProductForm({ title: item.title, price: item.price, category: item.category, status: item.status }); setIsProductModalOpen(true); }} className="p-2 hover:bg-blue-50 text-blue-500 rounded-lg transition-colors"><Edit className="w-4 h-4" /></button>
+                                    <button onClick={() => handleListingDelete(item._id)} className="p-2 hover:bg-red-50 text-red-500 rounded-lg transition-colors"><Trash2 className="w-4 h-4" /></button>
+                                  </div>
+                                </td>
+                              </tr>
+                            ))
+                          )}
                         </tbody>
                       </table>
                     </div>
@@ -378,7 +473,20 @@ export function AdminPanel() {
                   <h1 className="text-4xl font-black text-gray-900 tracking-tighter">User Directory</h1>
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Full access to account management and system roles</p>
                 </div>
-                <Button size="sm" className="rounded-xl px-6" onClick={() => { setEditingUser(null); setUserForm({ name: '', email: '', password: '', role: 'user', status: 'active' }); setIsUserModalOpen(true); }}>
+                <Button size="sm" className="rounded-xl px-6" onClick={() => { 
+                  setEditingUser(null); 
+                  setUserForm({ 
+                    name: '', 
+                    email: '', 
+                    password: '', 
+                    role: 'user', 
+                    status: 'approved',
+                    regNo: '',
+                    college: '',
+                    department: ''
+                  }); 
+                  setIsUserModalOpen(true); 
+                }}>
                   <Plus className="w-4 h-4 mr-2" /> Add System User
                 </Button>
               </div>
@@ -422,7 +530,20 @@ export function AdminPanel() {
                           <td className="px-8 py-5 text-right">
                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button 
-                                onClick={() => { setEditingUser(u); setUserForm({ name: u.name, email: u.email, role: u.role, status: u.status, password: '' }); setIsUserModalOpen(true); }}
+                                onClick={() => { 
+                                  setEditingUser(u); 
+                                  setUserForm({ 
+                                    name: u.name || '', 
+                                    email: u.email || '', 
+                                    role: u.role || 'user', 
+                                    status: u.status || 'approved', 
+                                    password: '',
+                                    regNo: u.regNo || '',
+                                    college: u.college || '',
+                                    department: u.department || ''
+                                  }); 
+                                  setIsUserModalOpen(true); 
+                                }}
                                 className="p-2.5 bg-gray-50 text-gray-400 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"
                               >
                                 <Edit className="w-4 h-4" />
@@ -621,39 +742,69 @@ export function AdminPanel() {
         </main>
       </div>
 
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: -50, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -50, scale: 0.9 }}
+            className="fixed top-24 left-1/2 -translate-x-1/2 z-[999] w-full max-w-md px-4"
+          >
+            <div className={`flex items-center gap-3 p-4 rounded-2xl border shadow-xl ${
+              toast.type === 'success' 
+                ? 'bg-emerald-50 border-emerald-100 text-emerald-800' 
+                : 'bg-red-50 border-red-100 text-red-800'
+            }`}>
+              <ShieldAlert className={`w-5 h-5 shrink-0 ${toast.type === 'success' ? 'text-emerald-500' : 'text-red-500'}`} />
+              <p className="text-xs font-black leading-tight flex-1">{toast.message}</p>
+              <button onClick={() => setToast(null)} className="p-1 hover:bg-black/5 rounded-lg transition-colors">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Modals */}
       <AnimatePresence>
         {isUserModalOpen && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
-            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-md rounded-[2.5rem] p-10 shadow-2xl border border-gray-100">
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-white w-full max-w-lg rounded-[2.5rem] p-10 shadow-2xl border border-gray-100">
               <h3 className="text-2xl font-black text-gray-900 mb-8">{editingUser ? 'Update User' : 'Add New User'}</h3>
               <form onSubmit={handleUserSubmit} className="space-y-4">
                 <div>
                   <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Full Name</label>
                   <Input value={userForm.name} onChange={e => setUserForm({...userForm, name: e.target.value})} placeholder="Name" required className="h-12 rounded-2xl" />
                 </div>
-                <div>
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Email Address</label>
-                  <Input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="Email" required className="h-12 rounded-2xl" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Email Address</label>
+                    <Input type="email" value={userForm.email} onChange={e => setUserForm({...userForm, email: e.target.value})} placeholder="Email" required className="h-12 rounded-2xl" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Register Number (Required)</label>
+                    <Input value={userForm.regNo} onChange={e => setUserForm({...userForm, regNo: e.target.value})} placeholder="192311111" required className="h-12 rounded-2xl" />
+                  </div>
                 </div>
                 {!editingUser && (
                   <div>
-                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Initial Password</label>
-                    <Input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} placeholder="Password (min 6 chars)" required className="h-12 rounded-2xl" />
+                    <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Initial Password (min 8 chars)</label>
+                    <Input type="password" value={userForm.password} onChange={e => setUserForm({...userForm, password: e.target.value})} placeholder="Password" required className="h-12 rounded-2xl" />
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase ml-1">System Role</label>
-                    <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full h-12 rounded-2xl bg-gray-50 border-gray-100 px-4 text-sm font-bold outline-none">
+                    <select value={userForm.role} onChange={e => setUserForm({...userForm, role: e.target.value})} className="w-full h-12 rounded-2xl bg-gray-50 border border-gray-100 px-4 text-sm font-bold outline-none">
                       <option value="user">User</option>
                       <option value="admin">Admin</option>
                     </select>
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-400 uppercase ml-1">Account Status</label>
-                    <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value})} className="w-full h-12 rounded-2xl bg-gray-50 border-gray-100 px-4 text-sm font-bold outline-none">
-                      <option value="active">Active</option>
+                    <select value={userForm.status} onChange={e => setUserForm({...userForm, status: e.target.value})} className="w-full h-12 rounded-2xl bg-gray-50 border border-gray-100 px-4 text-sm font-bold outline-none">
+                      <option value="approved">Approved</option>
                       <option value="suspended">Suspended</option>
                     </select>
                   </div>

@@ -44,8 +44,24 @@ const productSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['active', 'sold', 'moderated'],
-      default: 'active'
+      enum: ['available', 'active', 'sold', 'moderated', 'deleted', 'archived'],
+      default: 'available'
+    },
+    isSold: {
+      type: Boolean,
+      default: false
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false
+    },
+    stock: {
+      type: Number,
+      default: 1
+    },
+    availability: {
+      type: String,
+      default: 'available'
     },
     featured: {
       type: Boolean,

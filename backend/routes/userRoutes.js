@@ -7,7 +7,11 @@ const {
   removeFromCart, 
   getCart,
   updateProfile,
-  updatePassword
+  updatePassword,
+  updatePrivacy,
+  updateNotificationPrefs,
+  getLoginActivity,
+  deactivateAccount
 } = require('../controllers/userController');
 const { protect } = require('../middleware/auth');
 
@@ -22,6 +26,10 @@ router.delete('/cart/:productId', protect, removeFromCart);
 router.post('/wishlist/:productId', protect, toggleWishlist);
 router.put('/profile', protect, updateProfile);
 router.put('/update-password', protect, updatePassword);
+router.put('/privacy', protect, updatePrivacy);
+router.put('/notifications', protect, updateNotificationPrefs);
+router.get('/login-activity', protect, getLoginActivity);
+router.delete('/deactivate', protect, deactivateAccount);
 router.get('/:id', getUser);
 router.post('/:id/rate', protect, rateUser);
 

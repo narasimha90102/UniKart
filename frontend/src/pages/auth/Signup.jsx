@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, User, ArrowRight, CheckCircle2, XCircle, Eye, EyeOff, Hash, BookOpen, GraduationCap } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, CheckCircle2, XCircle, Eye, EyeOff, Hash } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useAuth } from '../../context/AuthContext';
@@ -20,6 +20,8 @@ export function Signup() {
   const [isPasswordFocused, setIsPasswordFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailValid, setEmailValid] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   const passwordRules = [
     { label: 'At least 8 characters', regex: /.{8,}/ },
@@ -32,12 +34,43 @@ export function Signup() {
   const { setUser } = useAuth();
   const [loading, setLoading] = useState(false);
 
+  // Real-time format checking
+  useEffect(() => {
+    if (!formData.email) {
+      setEmailValid(false);
+      setEmailError('');
+      return;
+    }
+
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(formData.email)) {
+      setEmailValid(false);
+      setEmailError('Please enter a valid email address');
+      return;
+    }
+
+    setEmailValid(true);
+    setEmailError('');
+  }, [formData.email]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!emailValid) {
+      setErrorMsg('Please provide a valid email address');
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setErrorMsg('Passwords do not match');
       return;
     }
+    
+    // Check password rules before submitting
+    const allRulesPassed = passwordRules.every(rule => rule.regex.test(formData.password));
+    if (!allRulesPassed) {
+      setErrorMsg('Please satisfy all password requirements');
+      return;
+    }
+
     setErrorMsg('');
     setLoading(true);
     
@@ -49,14 +82,10 @@ export function Signup() {
         regNo: formData.regNo
       });
 
-      // The /auth/register route already sends the OTP email via the backend
-
-      // Redirect to OTP verification page
-      navigate('/verify-otp', { 
+      // Redirect to Login page with success message
+      navigate('/login', { 
         state: { 
-          userId: response.data.userId || response.data._id, 
-          email: formData.email,
-          message: response.data.isPending ? 'Your account is pending verification. A new code has been sent.' : 'Account created! Check your email for the OTP.'
+          message: 'Account created successfully! Your account is pending administrator approval.'
         } 
       });
 
@@ -92,7 +121,7 @@ export function Signup() {
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {errorMsg && (
-            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-medium border border-red-100">
+            <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm text-center font-medium border border-red-100 animate-shake">
               {errorMsg}
             </div>
           )}
@@ -110,16 +139,37 @@ export function Signup() {
             </div>
             
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 transition-colors ${
+                formData.email 
+                  ? emailValid 
+                    ? 'text-emerald-500' 
+                    : 'text-red-400' 
+                  : 'text-gray-400'
+              }`} />
               <Input
                 name="email"
                 type="email"
                 required
-                className="pl-11 h-12 text-base rounded-xl bg-gray-50 border-gray-200 focus:bg-white"
+                value={formData.email}
+                className={`pl-11 h-12 text-base rounded-xl transition-all ${
+                  formData.email
+                    ? emailValid
+                      ? 'border-emerald-500 bg-emerald-50/5 focus:border-emerald-600 focus:ring-emerald-200'
+                      : 'border-red-300 bg-red-50/5 focus:border-red-400 focus:ring-red-200'
+                    : 'bg-gray-50 border-gray-200 focus:bg-white'
+                }`}
                 placeholder="Student Email (e.g. name@university.edu)"
                 onChange={(e) => setFormData({...formData, email: e.target.value})}
               />
             </div>
+
+            {/* Email Status Message */}
+            {emailError && (
+              <div className="mt-1 ml-1 flex items-center gap-2 text-[11px] font-extrabold text-red-500">
+                <XCircle className="w-3.5 h-3.5" />
+                <span>{emailError}</span>
+              </div>
+            )}
 
             <div className="relative">
               <Hash className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -132,7 +182,6 @@ export function Signup() {
                 onChange={(e) => setFormData({...formData, regNo: e.target.value})}
               />
             </div>
-
 
             <div className="relative">
               <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
@@ -208,10 +257,22 @@ export function Signup() {
           <Button 
             type="submit" 
             size="lg" 
-            className="w-full rounded-xl text-base h-12 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20"
-            disabled={loading}
+            className="w-full rounded-xl text-base h-12 bg-primary hover:bg-primary/90 shadow-md shadow-primary/20 flex items-center justify-center gap-2"
+            disabled={loading || !emailValid}
           >
-            {loading ? 'Creating Account...' : 'Create Account'} <ArrowRight className="ml-2 w-5 h-5" />
+            {loading ? (
+              <>
+                <svg className="animate-spin -ml-1 mr-2 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                Creating Account...
+              </>
+            ) : (
+              <>
+                Create Account <ArrowRight className="ml-2 w-5 h-5" />
+              </>
+            )}
           </Button>
           
           <div className="mt-6">

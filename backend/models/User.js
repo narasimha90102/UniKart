@@ -12,7 +12,6 @@ const userSchema = new mongoose.Schema(
     email: {
       type: String,
       required: [true, 'Please provide your university email'],
-      unique: true,
       lowercase: true,
       trim: true,
       match: [
@@ -45,6 +44,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: [15, 'Phone number cannot exceed 15 characters']
+    },
+    bio: {
+      type: String,
+      default: ''
     },
     avatar: {
       type: String,
@@ -100,6 +103,24 @@ const userSchema = new mongoose.Schema(
         }
       }
     ],
+    // Privacy & Notification Preferences
+    privacy: {
+      publicProfile: { type: Boolean, default: true },
+      showPhone: { type: Boolean, default: true },
+      showEmail: { type: Boolean, default: false },
+      showOnline: { type: Boolean, default: true },
+    },
+    notifPrefs: {
+      messages: { type: Boolean, default: true },
+      orders: { type: Boolean, default: true },
+      deals: { type: Boolean, default: true },
+      reviews: { type: Boolean, default: true },
+      pushEnabled: { type: Boolean, default: true },
+      emailDigest: { type: Boolean, default: false },
+    },
+    twoFA: { type: Boolean, default: false },
+    addresses: { type: Array, default: [] },
+    paymentMethods: { type: Array, default: [] },
     lastLogin: Date,
     verifiedAt: Date
   },

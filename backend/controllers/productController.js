@@ -142,6 +142,17 @@ exports.updateProduct = async (req, res, next) => {
       return res.status(401).json({ success: false, message: 'Not authorized to update this product' });
     }
 
+    // Auto-update schema properties when status shifts
+    if (req.body.status === 'sold') {
+      req.body.isSold = true;
+      req.body.stock = 0;
+      req.body.availability = 'unavailable';
+    } else if (req.body.status === 'available' || req.body.status === 'active') {
+      req.body.isSold = false;
+      req.body.stock = req.body.stock !== undefined ? req.body.stock : 1;
+      req.body.availability = 'available';
+    }
+
     product = await Product.findByIdAndUpdate(req.params.id, req.body, {
       new: true,
       runValidators: true

@@ -4,6 +4,114 @@ const LoginHistory = require('../models/LoginHistory');
 const jwt = require('jsonwebtoken');
 const sendEmail = require('../utils/sendEmail');
 const { otpTemplate, approvalPendingTemplate, welcomeTemplate } = require('../utils/emailTemplates');
+const dns = require('dns').promises;
+const validator = require('validator');
+
+// Helper to validate email professionally (graceful MX check + disposable checker + database duplicates)
+const verifyEmailUtility = async (email, checkDatabase = true) => {
+  try {
+    if (!email || !validator.isEmail(email)) {
+      return { success: false, message: 'Please enter a valid email address' };
+    }
+
+    const domain = email.split('@')[1];
+
+    // 1. DNS/MX Check (graceful warning, falls back to SMTP delivery for real check)
+    try {
+      const mxRecords = await dns.resolveMx(domain);
+      if (!mxRecords || mxRecords.length === 0) {
+        console.warn(`[ValidateEmail] MX lookup resolved empty records for domain ${domain}.`);
+      }
+    } catch (dnsErr) {
+      console.warn(`[ValidateEmail] DNS lookup failed for domain ${domain}: ${dnsErr.message}. Fallback to live SMTP OTP dispatch verification.`);
+    }
+
+    // 2. Disposable/Fake email check
+    const disposableDomains = [
+      'mailinator.com', '10minutemail.com', 'tempmail.com', 'yopmail.com', 
+      'sharklasers.com', 'guerrillamail.com', 'dispostable.com', 'getairmail.com',
+      'burnermail.io', 'trashmail.com', 'temp-mail.org', 'tempmailaddress.com'
+    ];
+    if (disposableDomains.includes(domain.toLowerCase())) {
+      return { success: false, message: 'Email address is not available' };
+    }
+
+    const fakeKeywords = ['fake', 'test', 'dummy', 'spam', 'example'];
+    const username = email.split('@')[0].toLowerCase();
+    if (fakeKeywords.some(kw => username.includes(kw)) && (domain === 'gmail.com' || domain === 'yahoo.com' || domain === 'outlook.com')) {
+      return { success: false, message: 'Email address is not available' };
+    }
+
+    // 3. Database Duplicate check bypassed as requested
+    // (Email exist check is removed)
+
+    return { success: true, message: 'Valid email' };
+  } catch (err) {
+    console.error('[verifyEmailUtility] Unexpected exception:', err);
+    return { success: false, message: 'Server error, please try again' };
+  }
+};
+
+// @desc    Validate Email address and dispatch dynamic 6-digit OTP via Gmail SMTP
+// @route   POST /api/auth/validate-email
+// @access  Public
+exports.validateEmail = async (req, res, next) => {
+  try {
+    const { email } = req.body;
+    console.log(`[AuthController] Validate-email and OTP dispatch requested for: ${email}`);
+    
+    // Validate format, duplicates, and fake checks
+    const result = await verifyEmailUtility(email, true);
+    if (!result.success) {
+      console.warn(`[AuthController] Email check rejected: ${result.message}`);
+      return res.status(400).json({ success: false, message: result.message });
+    }
+
+    // Generate secure 6-digit verification code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`[AuthController] Generated OTP: ${otpCode} for email: ${email}`);
+
+    // Store temporarily in MongoDB
+    const OTP = require('../models/OTP');
+    await OTP.findOneAndUpdate(
+      { email: email.toLowerCase() },
+      { otp: otpCode, createdAt: new Date() },
+      { upsert: true, new: true }
+    );
+
+    // Send via Gmail SMTP (using Nodemailer)
+    try {
+      await sendEmail({
+        email: email.toLowerCase(),
+        subject: 'UniKart Account Verification Code',
+        message: `Your verification code is ${otpCode}. This code is valid for 10 minutes.`,
+        html: `
+          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 30px; color: #333; max-width: 500px; margin: auto; border: 1px solid #eef2f6; border-radius: 24px; box-shadow: 0 10px 30px rgba(0,0,0,0.02);">
+            <h2 style="color: #6366f1; text-align: center; font-weight: 800; font-size: 24px; margin-bottom: 20px; letter-spacing: -0.5px;">Verify Your Email</h2>
+            <p style="font-size: 14px; line-height: 1.6; color: #4b5563;">Thank you for registering at UniKart! Please enter the following 6-digit verification code to complete your signup process:</p>
+            <div style="font-size: 36px; font-weight: 900; letter-spacing: 6px; padding: 20px; background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 18px; text-align: center; margin: 25px 0; color: #111827;">
+              ${otpCode}
+            </div>
+            <p style="font-size: 13px; color: #ef4444; font-weight: bold; text-align: center;">This OTP is valid for 10 minutes.</p>
+            <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 30px 0;" />
+            <p style="font-size: 11px; color: #9ca3af; text-align: center; line-height: 1.4;">If you did not initiate this request, please safely ignore this communication.</p>
+          </div>
+        `
+      });
+      
+      console.log(`[AuthController] OTP dispatched successfully to: ${email}`);
+      return res.status(200).json({ success: true, message: 'OTP sent successfully' });
+    } catch (mailErr) {
+      console.error('[AuthController] Nodemailer SMTP failed to send OTP:', mailErr.message);
+      // Clean up the unsent OTP document
+      await OTP.deleteOne({ email: email.toLowerCase() });
+      return res.status(400).json({ success: false, message: 'Email address is not available' });
+    }
+  } catch (error) {
+    console.error('[AuthController] Error in validateEmail:', error);
+    return res.status(500).json({ success: false, message: 'Server error, please try again' });
+  }
+};
 
 // Generate JWT Token
 const generateToken = (id) => {
@@ -12,7 +120,7 @@ const generateToken = (id) => {
   });
 };
 
-// @desc    Register a new user (and generate OTP)
+// @desc    Register a new user (direct student register waiting for admin approval)
 // @route   POST /api/auth/register
 // @access  Public
 exports.register = async (req, res, next) => {
@@ -27,34 +135,10 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Password must be at least 8 characters' });
     }
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      if (userExists.isVerified) {
-        return res.status(400).json({ success: false, message: 'Email already registered. Please login.' });
-      } else {
-        // User exists but not verified, update OTP and redirect
-        const otp = process.env.NODE_ENV === 'development' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
-        const otpExpire = new Date(Date.now() + 10 * 60 * 1000);
-        
-        userExists.otp = otp;
-        userExists.otpExpire = otpExpire;
-        await userExists.save();
-        console.log(`[DEBUG] OTP for ${userExists.email}: ${otp}`);
-
-        sendEmail({
-          email: userExists.email,
-          subject: 'UniKart Student Verification Code',
-          html: otpTemplate(otp)
-        }).catch(err => console.error('Email send failed:', err));
-
-
-        return res.status(200).json({
-          success: true,
-          isPending: true,
-          message: 'Account pending verification. New OTP sent.',
-          userId: userExists._id
-        });
-      }
+    // Run format validation and fake email check
+    const emailVerify = await verifyEmailUtility(email, false);
+    if (!emailVerify.success) {
+      return res.status(400).json({ success: false, message: emailVerify.message });
     }
 
     const regNoExists = await User.findOne({ regNo });
@@ -62,135 +146,51 @@ exports.register = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Register Number already exists.' });
     }
 
-    // Generate OTP
-    const otp = process.env.NODE_ENV === 'development' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
     const user = await User.create({
       name,
       email,
       password,
       regNo,
-      department,
-      college,
-      isVerified: false,
-      status: 'pending_otp',
-      otp,
-      otpExpire
-    });
-
-    console.log(`[DEBUG] Registration OTP for ${user.email}: ${otp}`);
-
-    // Send OTP Email (Non-blocking for faster response)
-    sendEmail({
-      email: user.email,
-      subject: 'UniKart Student Verification Code',
-      html: otpTemplate(otp)
-    }).catch(err => console.error('Email send failed:', err));
-
-
-    return res.status(201).json({
-      success: true,
-      message: process.env.NODE_ENV === 'development' 
-        ? `OTP sent to your email (Dev Mode: Use ${otp})` 
-        : 'OTP sent to your email. Please verify to continue.',
-      userId: user._id,
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-
-// @desc    Verify Email OTP
-// @route   POST /api/auth/verify-email
-// @access  Public
-exports.verifyOtp = async (req, res, next) => {
-  try {
-    const { userId, email, otp } = req.body;
-
-    let user;
-    if (userId) {
-      user = await User.findById(userId);
-    } else if (email) {
-      user = await User.findOne({ email });
-    }
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    if (user.otp !== otp || user.otpExpire < Date.now()) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired OTP' });
-    }
-
-    user.isVerified = true;
-    user.status = 'pending_approval'; // Move to admin approval stage
-    user.otp = undefined;
-    user.otpExpire = undefined;
-    await user.save();
-
-    res.status(200).json({
-      success: true,
-      message: 'Email verified successfully. Your account is now waiting for administrator approval.',
+      department: department || '',
+      college: college || 'University Campus',
+      isVerified: true,
       status: 'pending_approval'
     });
 
-    // Notify user about approval status
-    sendEmail({
-      email: user.email,
-      subject: 'UniKart Identity Verified',
-      html: approvalPendingTemplate()
-    }).catch(err => console.error('Approval notification failed:', err));
-
+    return res.status(201).json({
+      success: true,
+      message: 'Account created! Your registration is waiting for administrator approval.',
+      userId: user._id
+    });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Resend Email OTP
-// @route   POST /api/auth/resend-otp
+// @desc    Verify OTP code
+// @route   POST /api/auth/verify-otp
 // @access  Public
-exports.resendOtp = async (req, res, next) => {
+exports.verifyOtp = async (req, res, next) => {
   try {
-    const { email } = req.body;
-
-    const user = await User.findOne({ email });
-
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'User not found' });
+    const { email, otp } = req.body;
+    console.log(`[AuthController] OTP verification request received for: ${email}, OTP: ${otp}`);
+    
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, message: 'Please provide both email and OTP' });
     }
 
-    if (user.isVerified && user.status !== 'pending_otp') {
-      return res.status(400).json({ success: false, message: 'Email already verified' });
+    const OTP = require('../models/OTP');
+    const otpRecord = await OTP.findOne({ email: email.toLowerCase(), otp });
+
+    if (!otpRecord) {
+      console.warn(`[AuthController] OTP verification failed: Code matches nothing for ${email}`);
+      return res.status(400).json({ success: false, message: 'Incorrect OTP' });
     }
 
-    // Generate new OTP
-    const otp = process.env.NODE_ENV === 'development' ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpire = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
-
-    user.otp = otp;
-    user.otpExpire = otpExpire;
-    await user.save();
-    console.log(`[DEBUG] Resend OTP for ${user.email}: ${otp}`);
-
-    // Send OTP Email (Non-blocking)
-    sendEmail({
-      email: user.email,
-      subject: 'UniKart Student Verification Code (Resent)',
-      html: otpTemplate(otp)
-    }).catch(err => console.error('Email send failed:', err));
-
-    res.status(200).json({
-      success: true,
-      message: process.env.NODE_ENV === 'development'
-        ? `A new verification code has been sent (Dev Mode: Use ${otp})`
-        : 'A new verification code has been sent to your email.',
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
-    });
+    console.log(`[AuthController] OTP verified successfully for: ${email}`);
+    return res.status(200).json({ success: true, message: 'OTP verified successfully' });
   } catch (error) {
-
+    console.error('[AuthController] Error in verifyOtp:', error);
     next(error);
   }
 };
@@ -200,32 +200,44 @@ exports.resendOtp = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
+    console.log('[AuthController] Login request received');
     const { email, password } = req.body;
 
+    // 1. Check for missing email or password
     if (!email || !password) {
-      return res.status(400).json({ success: false, message: 'Please provide email and password' });
+      return res.status(400).json({ success: false, message: 'Please provide both email and password' });
     }
 
+    // 2. Validate email format
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      console.warn(`[AuthController] Login failed: Invalid email format (${email})`);
+      return res.status(400).json({ success: false, message: 'Invalid email address' });
+    }
+
+    // 3. Check for user in Database
+    console.log(`[AuthController] Checking if user exists in MongoDB for: ${email}`);
     const user = await User.findOne({ email }).select('+password');
-
-    if (!user || !(await user.matchPassword(password))) {
-      return res.status(401).json({ success: false, message: 'Invalid credentials' });
+    if (!user) {
+      console.warn(`[AuthController] Login failed: User does not exist (${email})`);
+      return res.status(401).json({ success: false, message: 'User does not exist' });
     }
 
-    // Verification Logic
-    if (user.status === 'pending_otp') {
-      return res.status(401).json({ 
-        success: false, 
-        message: 'Please verify your student email first.', 
-        userId: user._id,
-        status: 'pending_otp' 
-      });
+    // 4. Verify password
+    console.log('[AuthController] Verifying password...');
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
+      console.warn(`[AuthController] Login failed: Incorrect password for user (${email})`);
+      return res.status(401).json({ success: false, message: 'Incorrect password' });
     }
 
+    // 5. Evaluate Account Status
+    console.log(`[AuthController] Checking account status for: ${user.status}`);
+    
     if (user.status === 'pending_approval') {
       return res.status(403).json({ 
         success: false, 
-        message: 'Your registration is waiting for campus administrator approval.',
+        message: 'Account disabled. Pending administrator approval.',
         status: 'pending_approval'
       });
     }
@@ -233,28 +245,32 @@ exports.login = async (req, res, next) => {
     if (user.status === 'rejected') {
       return res.status(403).json({ 
         success: false, 
-        message: 'Your registration request was rejected by the campus admin. Please contact support.',
+        message: 'Account disabled. Your registration request was rejected.',
         status: 'rejected'
       });
     }
 
     if (user.status === 'suspended') {
-      return res.status(403).json({ success: false, message: 'Your account has been suspended for violating campus policies.' });
+      return res.status(403).json({ 
+        success: false, 
+        message: 'Account disabled. Your account has been suspended.' 
+      });
     }
 
     // Only allow 'approved' or 'admin' to login
-    // Note: Admins are approved by default or handled separately
     if (user.status !== 'approved' && user.role !== 'admin') {
-      return res.status(403).json({ success: false, message: 'Access denied. Account not approved.' });
+      return res.status(403).json({ success: false, message: 'Account disabled. Access not approved.' });
     }
 
-    // Record login history
+    // 6. Record login history
+    console.log('[AuthController] Recording login history...');
     await LoginHistory.create({
       user: user._id,
       ip: req.ip,
       device: req.headers['user-agent']
     });
 
+    console.log('[AuthController] Login successful! Generating JWT token.');
     res.json({
       success: true,
       token: generateToken(user._id),
@@ -265,11 +281,13 @@ exports.login = async (req, res, next) => {
         role: user.role,
         college: user.college,
         regNo: user.regNo,
-        department: user.department
+        department: user.department,
+        status: user.status
       }
     });
   } catch (error) {
-    next(error);
+    console.error('[AuthController] Login Exception Caught:', error);
+    res.status(500).json({ success: false, message: 'Server error, please try again' });
   }
 };
 

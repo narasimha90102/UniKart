@@ -45,24 +45,77 @@ exports.updateUserStatus = async (req, res, next) => {
 // @access  Private/Admin
 exports.createUser = async (req, res, next) => {
   try {
-    const { name, email, password, role, college } = req.body;
+    console.log('[AdminController] createUser called');
+    console.log('[AdminController] Request body received:', req.body);
 
-    const userExists = await User.findOne({ email });
-    if (userExists) {
-      return res.status(400).json({ success: false, message: 'User already exists' });
+    const { name, email, password, role, college, regNo, status, department } = req.body;
+
+    // 1. Validation for required fields
+    if (!name || !email || !password || !regNo) {
+      console.warn('[AdminController] Validation failed: Missing required fields');
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Please provide all required fields: Name, Email, Password, and Register Number.' 
+      });
     }
 
+    // 2. Password length validation (since schema expects minlength 8)
+    if (password.length < 8) {
+      console.warn('[AdminController] Validation failed: Password too short');
+      return res.status(400).json({
+        success: false,
+        message: 'Password must be at least 8 characters long.'
+      });
+    }
+
+    // 3. Email format validation (matching the schema regex)
+    const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
+    if (!emailRegex.test(email)) {
+      console.warn('[AdminController] Validation failed: Invalid email format');
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide a valid university email address.'
+      });
+    }
+
+    // 4. Check duplicate email
+    console.log('[AdminController] Checking for duplicate email...');
+    const emailExists = await User.findOne({ email });
+    if (emailExists) {
+      console.warn(`[AdminController] Duplicate check failed: Email ${email} already exists.`);
+      return res.status(400).json({ success: false, message: 'A user with this email address already exists.' });
+    }
+
+    // 5. Check duplicate regNo
+    console.log('[AdminController] Checking for duplicate Register Number...');
+    const regNoExists = await User.findOne({ regNo });
+    if (regNoExists) {
+      console.warn(`[AdminController] Duplicate check failed: Register Number ${regNo} already exists.`);
+      return res.status(400).json({ success: false, message: 'A user with this Register Number already exists.' });
+    }
+
+    // 6. Create User in MongoDB
+    console.log('[AdminController] Creating user document in MongoDB...');
     const user = await User.create({
       name,
       email,
       password,
+      regNo,
       role: role || 'user',
       college: college || 'University Campus',
+      department: department || '',
+      status: status || 'approved',
       isVerified: true
     });
 
-    res.status(201).json({ success: true, data: user });
+    // Remove password from output
+    const userResponse = user.toObject();
+    delete userResponse.password;
+
+    console.log('[AdminController] User created successfully in DB:', userResponse);
+    res.status(201).json({ success: true, data: userResponse });
   } catch (error) {
+    console.error('[AdminController] Error in createUser:', error);
     next(error);
   }
 };
@@ -72,20 +125,51 @@ exports.createUser = async (req, res, next) => {
 // @access  Private/Admin
 exports.updateUser = async (req, res, next) => {
   try {
-    const { name, email, role, status } = req.body;
+    console.log(`[AdminController] updateUser called for ID: ${req.params.id}`);
+    console.log('[AdminController] Request body received:', req.body);
+
+    const { name, email, role, status, regNo, college, department } = req.body;
     
+    // Check if email is already taken by another user
+    if (email) {
+      const emailExists = await User.findOne({ email, _id: { $ne: req.params.id } });
+      if (emailExists) {
+        console.warn(`[AdminController] Update failed: Email ${email} is already registered to another account.`);
+        return res.status(400).json({ success: false, message: 'Email is already taken by another user' });
+      }
+    }
+
+    // Check if regNo is already taken by another user
+    if (regNo) {
+      const regNoExists = await User.findOne({ regNo, _id: { $ne: req.params.id } });
+      if (regNoExists) {
+        console.warn(`[AdminController] Update failed: Register Number ${regNo} is already registered to another account.`);
+        return res.status(400).json({ success: false, message: 'Register Number is already taken by another user' });
+      }
+    }
+
+    const updateFields = { name, email, role, status };
+    if (regNo !== undefined) updateFields.regNo = regNo;
+    if (college !== undefined) updateFields.college = college;
+    if (department !== undefined) updateFields.department = department;
+
+    console.log('[AdminController] Executing Mongoose update with:', updateFields);
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { name, email, role, status },
+      updateFields,
       { new: true, runValidators: true }
     ).select('-password');
 
     if (!user) {
+      console.warn(`[AdminController] User with ID ${req.params.id} not found.`);
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    console.log('[AdminController] User updated successfully:', user);
     res.json({ success: true, data: user });
   } catch (error) {
+    console.error('[AdminController] Error in updateUser:', error);
     next(error);
   }
 };
@@ -112,14 +196,26 @@ exports.deleteUser = async (req, res, next) => {
   }
 };
 
-// @desc    Get all products (including moderated/sold)
+// @desc    Get all active/available products for oversight
 // @route   GET /api/admin/products
 // @access  Private/Admin
 exports.getAllProducts = async (req, res, next) => {
   try {
-    const products = await Product.find().populate('seller', 'name email');
+    console.log('[AdminController] Fetching available marketplace listings for oversight...');
+    const products = await Product.find({
+      status: { $in: ['available', 'active'] },
+      isSold: { $ne: true },
+      isDeleted: { $ne: true },
+      $or: [
+        { stock: { $exists: false } },
+        { stock: { $gt: 0 } }
+      ]
+    }).populate('seller', 'name email');
+
+    console.log(`[AdminController] Query matched and retrieved ${products.length} active products.`);
     res.json({ success: true, count: products.length, data: products });
   } catch (error) {
+    console.error('[AdminController] Error fetching oversight products:', error);
     next(error);
   }
 };
