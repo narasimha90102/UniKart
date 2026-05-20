@@ -81,9 +81,30 @@ export function Profile() {
     if (user?._id) fetchStats();
   }, [user?._id, user?.wishlist]);
 
+  const cleanPhone = (phone) => {
+    let clean = (phone || '').replace(/\s+/g, '');
+    if (clean.startsWith('+91')) {
+      clean = clean.slice(3);
+    } else if (clean.startsWith('91') && clean.length === 12) {
+      clean = clean.slice(2);
+    }
+    return clean;
+  };
+
+  const isPhoneValid = (phone) => {
+    const clean = cleanPhone(phone);
+    const phoneRegex = /^[6-9]\d{9}$/;
+    return phoneRegex.test(clean);
+  };
+
+  const isFormValid = 
+    formData.name.trim() !== '' &&
+    isPhoneValid(formData.phone) &&
+    (isAdmin || (formData.department && formData.department.trim() !== ''));
+
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.name.trim()) return setSaveError('Name cannot be empty.');
+    if (!isFormValid) return;
     setIsSaving(true);
     setSaveError('');
     try {
@@ -153,27 +174,33 @@ export function Profile() {
         </div>
 
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-2xl shadow-gray-200/40">
-          <div className="flex flex-col items-center gap-6 mb-10">
-            <div className="relative group">
-              <img 
-                src={formData.avatar || user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=1B8C50&color=fff&size=200`} 
-                alt="User" 
-                className="w-32 h-32 rounded-[2.5rem] object-cover ring-4 ring-primary/5 transition-all group-hover:brightness-90" 
-              />
-              <label className="absolute bottom-0 right-0 p-2.5 bg-primary text-white rounded-2xl shadow-lg cursor-pointer hover:scale-110 transition-transform">
-                <Camera className="w-5 h-5" />
-                <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
-              </label>
-            </div>
-            <div className="text-center">
-              <h2 className="text-xl font-black text-gray-900">{user?.name}</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{user?.email}</p>
-            </div>
-          </div>
-
           <form onSubmit={handleSave} className="space-y-6">
+            <div className="flex flex-col items-center gap-6 mb-10">
+              <div className="relative group">
+                {formData.avatar && formData.avatar !== 'default-avatar.png' ? (
+                  <img 
+                    src={formData.avatar} 
+                    alt="User" 
+                    className="w-32 h-32 rounded-full object-cover ring-4 ring-primary/5 transition-all group-hover:brightness-90" 
+                  />
+                ) : (
+                  <div className="default-avatar w-32 h-32 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-5xl uppercase ring-4 ring-primary/5 select-none transition-all group-hover:brightness-90 shadow-inner">
+                    {(formData.name || user?.name || 'U').charAt(0).toUpperCase()}
+                  </div>
+                )}
+                <label className="absolute bottom-0 right-0 p-2.5 bg-primary text-white rounded-2xl shadow-lg cursor-pointer hover:scale-110 transition-transform">
+                  <Camera className="w-5 h-5" />
+                  <input type="file" className="hidden" accept="image/*" onChange={handleAvatarChange} />
+                </label>
+              </div>
+              <div className="text-center">
+                <h2 className="text-xl font-black text-gray-900">{user?.name}</h2>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{user?.email}</p>
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name *</label>
               <Input
                 value={formData.name}
                 onChange={e => setFormData({...formData, name: e.target.value})}
@@ -181,7 +208,7 @@ export function Profile() {
               />
             </div>
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number *</label>
               <Input
                 value={formData.phone}
                 onChange={e => setFormData({...formData, phone: e.target.value})}
@@ -191,7 +218,7 @@ export function Profile() {
             </div>
             {!isAdmin && (
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">College/Department</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">College/Department *</label>
                 <Input
                   value={formData.department}
                   onChange={e => setFormData({...formData, department: e.target.value})}
@@ -215,7 +242,7 @@ export function Profile() {
             
             <div className="flex gap-4 pt-4">
               <Button type="button" variant="outline" className="flex-1 h-14 rounded-2xl font-bold" onClick={() => setView('overview')}>Cancel</Button>
-              <Button type="submit" disabled={isSaving} className="flex-1 h-14 rounded-2xl font-black shadow-xl shadow-primary/20">
+              <Button type="submit" disabled={!isFormValid || isSaving} className="flex-1 h-14 rounded-2xl font-black shadow-xl shadow-primary/20">
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
@@ -234,12 +261,18 @@ export function Profile() {
         
         <div className="relative z-10 flex flex-col items-center gap-6">
           <div className="relative">
-            <img 
-              src={user?.avatar || `https://ui-avatars.com/api/?name=${user?.name || 'User'}&background=fff&color=1B8C50&size=200`} 
-              alt="User" 
-              className="w-32 h-32 rounded-[2.5rem] object-cover ring-4 ring-white/20" 
-            />
-            {user?.isVerified && (
+            {user?.avatar && user.avatar !== 'default-avatar.png' ? (
+              <img 
+                src={user.avatar} 
+                alt="User" 
+                className="w-32 h-32 rounded-full object-cover ring-4 ring-white/20" 
+              />
+            ) : (
+              <div className="default-avatar w-32 h-32 rounded-full bg-white text-[#1B8C50] font-black flex items-center justify-center text-5xl uppercase ring-4 ring-white/20 select-none shadow-inner">
+                {(user?.name || 'U').charAt(0).toUpperCase()}
+              </div>
+            )}
+            {user?.isVerified && !isAdmin && (
               <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-emerald-400 rounded-full border-4 border-[#1B8C50] flex items-center justify-center">
                 <CheckCircle className="w-5 h-5 text-white" />
               </div>
@@ -250,9 +283,11 @@ export function Profile() {
             <p className="text-emerald-100 text-sm font-medium mt-1">{user?.email}</p>
             <div className="flex flex-wrap justify-center gap-2 mt-4">
               <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest">{user?.role || 'Student'}</span>
-              <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest">
-                {user?.isVerified ? 'Verified Campus User' : 'Unverified Account'}
-              </span>
+              {!isAdmin && (
+                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest">
+                  {user?.isVerified ? 'Verified Campus User' : 'Unverified Account'}
+                </span>
+              )}
             </div>
           </div>
           <Button variant="outline" className="border-white/30 text-white hover:bg-white hover:text-primary transition-all rounded-2xl px-8 h-12 font-bold mt-2" onClick={() => setView('edit')}>
@@ -311,12 +346,21 @@ export function Profile() {
               </p>
               <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Joined Date</p>
             </div>
-            <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
-              <p className={`text-sm font-black leading-none uppercase tracking-widest mt-1 ${user?.isVerified ? 'text-emerald-500' : 'text-orange-500'}`}>
-                {user?.isVerified ? 'Verified' : 'Pending'}
-              </p>
-              <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Verification Status</p>
-            </div>
+            {!isAdmin ? (
+              <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
+                <p className={`text-sm font-black leading-none uppercase tracking-widest mt-1 ${user?.isVerified ? 'text-emerald-500' : 'text-orange-500'}`}>
+                  {user?.isVerified ? 'Verified' : 'Pending'}
+                </p>
+                <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Verification Status</p>
+              </div>
+            ) : (
+              <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
+                <p className="text-sm font-black leading-none uppercase tracking-widest mt-1 text-primary">
+                  System Admin
+                </p>
+                <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Account Type</p>
+              </div>
+            )}
           </div>
         </div>
 

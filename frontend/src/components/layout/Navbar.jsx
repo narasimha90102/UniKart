@@ -113,7 +113,13 @@ export function Navbar() {
                   {/* ... (keep existing desktop profile dropdown) ... */}
                   <Link to={user.role === 'admin' ? '/admin/dashboard' : '/dashboard'}>
                     <div className="flex items-center gap-2 cursor-pointer bg-gray-50 px-4 py-1.5 rounded-full hover:bg-gray-100 transition-colors border border-gray-200">
-                      <img src={`https://ui-avatars.com/api/?name=${user.name}&background=1B8C50&color=fff`} alt="User" className="w-7 h-7 rounded-full" />
+                      {user.avatar && user.avatar !== 'default-avatar.png' ? (
+                        <img src={user.avatar} alt="User" className="w-7 h-7 rounded-full object-cover" />
+                      ) : (
+                        <div className="default-avatar w-7 h-7 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-xs uppercase select-none">
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
                       <span className="text-sm font-medium text-gray-700">{user.role === 'admin' ? 'Admin' : user.name}</span>
                     </div>
                   </Link>
@@ -131,16 +137,16 @@ export function Navbar() {
               <div className="flex items-center gap-2 sm:gap-4">
                 <Link to="/login">
                   <Button 
-                    variant={location.pathname === '/login' ? 'default' : 'ghost'} 
-                    className={`rounded-lg px-4 sm:px-6 font-semibold transition-all ${location.pathname === '/login' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-600 hover:text-primary'}`}
+                    variant={location.pathname !== '/signup' ? 'default' : 'ghost'} 
+                    className={`rounded-lg px-4 sm:px-6 font-semibold transition-all ${location.pathname !== '/signup' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-600 hover:text-primary'}`}
                   >
                     Login
                   </Button>
                 </Link>
                 <Link to="/signup">
                   <Button 
-                    variant={location.pathname === '/signup' || location.pathname === '/' ? 'default' : 'ghost'} 
-                    className={`rounded-lg px-4 sm:px-6 font-semibold transition-all ${location.pathname === '/signup' || location.pathname === '/' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-600 hover:text-primary'}`}
+                    variant={location.pathname === '/signup' ? 'default' : 'ghost'} 
+                    className={`rounded-lg px-4 sm:px-6 font-semibold transition-all ${location.pathname === '/signup' ? 'bg-primary text-white shadow-lg shadow-primary/20' : 'text-gray-600 hover:text-primary'}`}
                   >
                     Sign Up
                   </Button>
@@ -157,16 +163,16 @@ export function Navbar() {
           <>
             <motion.div
               initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
+              animate={{ opacity: 0.5 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsMobileMenuOpen(false)}
-              className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[60] md:hidden"
+              className="fixed inset-0 bg-black z-[60] md:hidden"
             />
             <motion.div
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+              transition={{ type: 'tween', duration: 0.2 }}
               className="fixed top-0 left-0 bottom-0 w-[280px] bg-white z-[70] md:hidden shadow-2xl flex flex-col"
             >
               <div className="p-6 border-b border-gray-100 flex items-center justify-between">
@@ -183,7 +189,13 @@ export function Navbar() {
                   <>
                     <div className="px-2 mb-6">
                       <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-2xl border border-gray-100">
-                        <img src={`https://ui-avatars.com/api/?name=${user.name}&background=1B8C50&color=fff`} alt="User" className="w-10 h-10 rounded-full" />
+                        {user.avatar && user.avatar !== 'default-avatar.png' ? (
+                          <img src={user.avatar} alt="User" className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="default-avatar w-10 h-10 rounded-full bg-emerald-600 text-white font-black flex items-center justify-center text-sm uppercase select-none">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
                         <div>
                           <p className="font-bold text-gray-900">{user.name}</p>
                           <p className="text-xs text-gray-500">{user.email}</p>

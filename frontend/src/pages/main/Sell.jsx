@@ -41,6 +41,15 @@ export function Sell() {
   const activeProducts = myProducts.filter(p => p.status === 'active');
   const soldProducts = myProducts.filter(p => p.status === 'sold');
   const [loading, setLoading] = useState(false);
+  const [toast, setToast] = useState(null);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => {
+      setToast(null);
+    }, 4000);
+  };
+
   const [formData, setFormData] = useState({
     title: '',
     price: '',
@@ -72,20 +81,26 @@ export function Sell() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (images.length === 0) return alert('Please upload at least one image');
+    if (images.length === 0) {
+      showToast('Please upload at least one image', 'error');
+      return;
+    }
     
     setLoading(true);
     try {
-      await api.post('/products', {
+      await api.post('/products/create', {
         ...formData,
         images: images,
         price: Number(formData.price)
       });
-      alert('Product listed successfully!');
+      showToast('Product listed successfully! Redirecting...', 'success');
       window.dispatchEvent(new Event('products-updated'));
-      navigate('/marketplace');
+      setTimeout(() => {
+        navigate('/marketplace');
+      }, 1500);
     } catch (err) {
-      alert(err.response?.data?.error || 'Failed to list product');
+      const errMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to list product';
+      showToast(errMsg, 'error');
     } finally {
       setLoading(false);
     }
@@ -247,8 +262,16 @@ export function Sell() {
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button type="button" variant="ghost" className="w-full sm:w-auto h-14 px-10 rounded-2xl font-bold" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button type="submit" disabled={loading} className="w-full sm:w-auto h-14 px-12 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20">
-              {loading ? 'Publishing...' : 'List Product Now'}
+            <Button type="submit" disabled={loading} className="w-full sm:w-auto h-14 px-12 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-2">
+              {loading ? (
+                <>
+                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  Publishing...
+                </>
+              ) : 'List Product Now'}
             </Button>
           </div>
         </form>
@@ -355,6 +378,36 @@ export function Sell() {
           </div>
         </div>
       </motion.div>
+
+      {/* Toast Notification */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 50, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-[999] flex items-center gap-3 px-6 py-4 rounded-2xl shadow-xl border backdrop-blur-md ${
+              toast.type === 'success'
+                ? 'bg-emerald-50/95 border-emerald-100 text-emerald-800'
+                : 'bg-red-50/95 border-red-100 text-red-800'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+            ) : (
+              <Info className="w-5 h-5 text-red-500 shrink-0" />
+            )}
+            <p className="text-sm font-bold leading-tight">{toast.message}</p>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="p-1 hover:bg-black/5 rounded-lg transition-colors ml-2"
+            >
+              <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

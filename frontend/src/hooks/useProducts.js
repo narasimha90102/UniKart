@@ -9,9 +9,10 @@ export function useProducts() {
     try {
       setLoading(true);
       const res = await api.get('/products');
+      console.log('[useProducts Hook] API response received successfully:', res.data);
       setProducts(res.data.data);
     } catch (err) {
-      console.error('Failed to fetch products', err);
+      console.error('[useProducts Hook] Failed to fetch products:', err);
     } finally {
       setLoading(false);
     }

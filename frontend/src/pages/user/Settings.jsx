@@ -123,13 +123,13 @@ export function Settings() {
         { label: 'Login Activity', desc: 'Recent login locations and times', icon: History, modal: 'loginActivity' },
         { label: 'Two-Factor Authentication', desc: 'Add extra layer of security', icon: Lock, modal: 'twoFA', value: user?.twoFA ? 'ON' : 'OFF' },
         { label: 'Blocked Users', desc: 'Manage your blocked list', icon: Users, modal: 'blockedUsers' },
-        {
+        ...( user?.role !== 'admin' && user?.isVerified ? [{
           label: 'Account Verification',
-          desc: 'Get the verified campus badge',
+          desc: 'Verified campus student',
           icon: CheckCircle,
-          value: user?.isVerified ? 'Verified' : 'Pending',
+          value: 'Verified',
           path: '/dashboard/profile'
-        },
+        }] : []),
       ]} />
 
       {/* Marketplace */}

@@ -215,7 +215,7 @@ export function Home() {
                 <span className="text-xs font-bold text-gray-400 tracking-widest uppercase mb-2">Step 01</span>
                 <h3 className="text-xl font-bold text-gray-900 mb-3 group-hover:text-[#1B8C50] transition-colors">Verify Your Account</h3>
                 <p className="text-sm text-gray-500 leading-relaxed">
-                  Register with your university email to join the trusted campus community.
+                  Sign up with your university email to join the trusted campus community.
                 </p>
               </motion.div>
             </Link>

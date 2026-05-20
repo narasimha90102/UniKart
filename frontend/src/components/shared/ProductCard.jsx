@@ -88,12 +88,22 @@ export function ProductCard({ product }) {
               </h3>
             </div>
 
-            <div className="flex items-center gap-2 mb-3">
+            <div className="flex items-center gap-2 mb-1.5">
                <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${conditionColor}`}>
                 {product.condition || 'New'}
               </span>
               <span className="text-[10px] font-bold text-gray-400">•</span>
               <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{product.category}</span>
+            </div>
+            
+            {/* Always-visible Seller Info */}
+            <div className="flex items-center gap-1.5 mb-3">
+              <img 
+                src={product.seller?.avatar || `https://ui-avatars.com/api/?name=${product.seller?.name || 'S'}&background=1B8C50&color=fff`} 
+                className="w-[18px] h-[18px] rounded-full border border-gray-100 shrink-0 object-cover" 
+                alt={product.seller?.name || 'Seller'}
+              />
+              <span className="text-[10px] font-bold text-gray-500 truncate">By {product.seller?.name || 'Campus Peer'}</span>
             </div>
             
             <div className="mt-auto">
