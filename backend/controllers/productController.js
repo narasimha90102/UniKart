@@ -48,18 +48,21 @@ exports.getProducts = async (req, res, next) => {
     removeFields.forEach((param) => delete reqQuery[param]);
 
     // Handle search text & status filter
-    const statusFilter = req.query.status || 'active';
+    // If no status is specified, default to fetching both 'active' and 'available' products
+    const statusFilter = req.query.status 
+      ? (req.query.status === 'all' ? { $exists: true } : req.query.status) 
+      : { $in: ['active', 'available'] };
     
     if (req.query.search) {
       query = Product.find({ 
         $text: { $search: req.query.search }, 
         ...reqQuery, 
-        status: req.query.status === 'all' ? { $exists: true } : statusFilter 
+        status: statusFilter 
       });
     } else {
       query = Product.find({ 
         ...reqQuery, 
-        status: req.query.status === 'all' ? { $exists: true } : statusFilter 
+        status: statusFilter 
       });
     }
 
@@ -116,9 +119,27 @@ exports.createProduct = async (req, res, next) => {
       req.body.location = req.user.college || 'Saveetha Engineering College';
     }
     
+    const { title, description, price, category, condition, images } = req.body;
+    
+    // Explicit Validation of Required Fields
+    if (!title || !description || !price || !category || !condition || !images || images.length === 0) {
+      console.warn('[ProductController] Product creation validation failed: missing fields.');
+      return res.status(400).json({
+        success: false,
+        message: 'Please provide all required fields: Title, Description, Price, Category, Condition, and at least one Image.'
+      });
+    }
+
+    // Default status to 'active' on creation to guarantee perfect visibility
+    if (!req.body.status) {
+      req.body.status = 'active';
+    }
+
     const product = await Product.create(req.body);
+    console.log('[ProductController] Successfully saved new product in MongoDB:', product);
     res.status(201).json({ success: true, data: product });
   } catch (error) {
+    console.error('[ProductController] Failed to save product:', error);
     next(error);
   }
 };

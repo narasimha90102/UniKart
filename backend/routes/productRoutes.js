@@ -17,6 +17,8 @@ router.route('/')
   .get(getProducts)
   .post(protect, createProduct);
 
+router.post('/create', protect, createProduct);
+
 router.route('/categories')
   .get(getCategories)
   .post(protect, createCategory);

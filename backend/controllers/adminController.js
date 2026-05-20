@@ -283,11 +283,15 @@ exports.handleVerification = async (req, res, next) => {
       await user.save();
 
       // Send Welcome Email
-      sendEmail({
-        email: user.email,
-        subject: 'Welcome to UniKart - Your Account is Approved!',
-        html: welcomeTemplate(user.name)
-      }).catch(err => console.error('Welcome email failed:', err));
+      try {
+        await sendEmail({
+          email: user.email,
+          subject: 'Welcome to UniKart - Your Account is Approved!',
+          html: welcomeTemplate(user.name)
+        });
+      } catch (err) {
+        console.error('Welcome email failed:', err.message);
+      }
     }
 
 

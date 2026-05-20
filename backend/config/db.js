@@ -1,3 +1,9 @@
+const dns = require('dns');
+try {
+  dns.setServers(['8.8.8.8', '8.8.4.4']);
+} catch (e) {
+  console.warn('[DNS Override Warning] Could not set Google DNS servers:', e.message);
+}
 const mongoose = require('mongoose');
 
 const connectDB = async () => {

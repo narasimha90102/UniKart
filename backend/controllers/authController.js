@@ -208,16 +208,19 @@ exports.login = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Please provide both email and password' });
     }
 
+    // Clean email input (trim whitespace and convert to lowercase)
+    const cleanedEmail = email.trim().toLowerCase();
+
     // 2. Validate email format
     const emailRegex = /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/;
-    if (!emailRegex.test(email)) {
-      console.warn(`[AuthController] Login failed: Invalid email format (${email})`);
+    if (!emailRegex.test(cleanedEmail)) {
+      console.warn(`[AuthController] Login failed: Invalid email format (${cleanedEmail})`);
       return res.status(400).json({ success: false, message: 'Invalid email address' });
     }
 
     // 3. Check for user in Database
-    console.log(`[AuthController] Checking if user exists in MongoDB for: ${email}`);
-    const user = await User.findOne({ email }).select('+password');
+    console.log(`[AuthController] Checking if user exists in MongoDB for: ${cleanedEmail}`);
+    const user = await User.findOne({ email: cleanedEmail }).select('+password');
     if (!user) {
       console.warn(`[AuthController] Login failed: User does not exist (${email})`);
       return res.status(401).json({ success: false, message: 'User does not exist' });
@@ -282,7 +285,14 @@ exports.login = async (req, res, next) => {
         college: user.college,
         regNo: user.regNo,
         department: user.department,
-        status: user.status
+        status: user.status,
+        isVerified: user.isVerified,
+        avatar: user.avatar,
+        phoneNumber: user.phoneNumber,
+        bio: user.bio,
+        wishlist: user.wishlist,
+        ratings: user.ratings,
+        createdAt: user.createdAt
       }
     });
   } catch (error) {
