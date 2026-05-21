@@ -8,6 +8,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { AppLayout } from './components/layout/AppLayout';
 import { Home } from './pages/main/Home';
 import { ProductDetails } from './pages/main/ProductDetails';
+import { Marketplace } from './pages/main/Marketplace';
 import { Sell } from './pages/main/Sell';
 import { SellerProfile } from './pages/main/SellerProfile';
 import { Login } from './pages/auth/Login';
@@ -43,6 +44,7 @@ function App() {
                 <Route path="/" element={<AppLayout />}>
                   <Route index element={<Home />} />
                   <Route path="product/:id" element={<ProductDetails />} />
+                  <Route path="marketplace" element={<Marketplace />} />
                   <Route path="user/:name" element={<SellerProfile />} />
                   <Route path="sell" element={<Sell />} />
                   <Route path="login" element={<Login />} />
