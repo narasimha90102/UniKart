@@ -1,40 +1,61 @@
-import axios from 'axios';
+import axios from "axios";
+
+const getBaseURL = () => {
+  // Development (Vite proxy handles /api → backend)
+  if (import.meta.env.DEV) {
+    return "/api";
+  }
+
+  // Production (Render / Backend URL)
+  return import.meta.env.VITE_API_URL;
+};
 
 const api = axios.create({
-  // In dev, Vite proxies /api → http://localhost:5000/api
-  baseURL: import.meta.env.DEV ? '/api' : (import.meta.env.VITE_API_URL || '/api'),
+  baseURL: getBaseURL(),
   headers: {
-    'Content-Type': 'application/json',
+    "Content-Type": "application/json",
   },
 });
 
-// Add a request interceptor to include the JWT token
+/* ---------------------------
+   REQUEST INTERCEPTOR
+---------------------------- */
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('unikart_token');
+    const token = localStorage.getItem("unikart_token");
+
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
     return config;
   },
   (error) => Promise.reject(error)
 );
 
-// Add a response interceptor to handle session expiration
-
+/* ---------------------------
+   RESPONSE INTERCEPTOR
+---------------------------- */
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    // Only redirect to login if the error is 401 AND we are NOT currently trying to log in
-    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
-      // Clear session data if token is invalid or expired
-      localStorage.removeItem('unikart_token');
-      localStorage.removeItem('unikart_user');
-      window.location.href = '/login?expired=true';
+    const isLoginRequest = error.config?.url?.includes("/auth/login");
+
+    if (
+      error.response?.status === 401 &&
+      !isLoginRequest
+    ) {
+      localStorage.removeItem("unikart_token");
+      localStorage.removeItem("unikart_user");
+
+      // prevent infinite redirect loops
+      if (window.location.pathname !== "/login") {
+        window.location.href = "/login?expired=true";
+      }
     }
+
     return Promise.reject(error);
   }
 );
-
 
 export default api;
