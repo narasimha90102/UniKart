@@ -27,7 +27,7 @@ const allowedOrigins = [
   'http://localhost:3000',
 ];
 
-// Add Render/production frontend URL if set
+// Add production frontend URL if set
 if (process.env.FRONTEND_URL) {
   allowedOrigins.push(process.env.FRONTEND_URL);
 }
@@ -81,7 +81,7 @@ app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
 app.use('/api/support', require('./routes/supportRoutes'));
 
-// Health check endpoint for Render
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
@@ -118,7 +118,7 @@ server.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 
-// Handle unhandled promise rejections (prevents silent crashes on Render)
+// Handle unhandled promise rejections (prevents silent crashes)
 process.on('unhandledRejection', (err) => {
   console.error('[FATAL] Unhandled Promise Rejection:', err.message || err);
   // Close server & exit process
