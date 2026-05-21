@@ -93,11 +93,11 @@ export function Sell() {
         images: images,
         price: Number(formData.price)
       });
-      showToast('Product listed successfully! Redirecting...', 'success');
+      showToast('Product listed successfully!', 'success');
       window.dispatchEvent(new Event('products-updated'));
       setTimeout(() => {
-        navigate('/marketplace');
-      }, 1500);
+        navigate('/dashboard');
+      }, 500);
     } catch (err) {
       const errMsg = err.response?.data?.message || err.response?.data?.error || 'Failed to list product';
       showToast(errMsg, 'error');
