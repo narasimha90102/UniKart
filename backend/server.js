@@ -25,6 +25,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
+  'https://unikart-flame.vercel.app'
 ];
 
 // Add production frontend URL if set
@@ -58,8 +59,8 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Enable CORS
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? allowedOrigins : '*',
-  credentials: false
+  origin: allowedOrigins,
+  credentials: true
 }));
 
 // Rate limiting (enabled in production)
@@ -90,7 +91,7 @@ app.get('/api/health', (req, res) => {
 if (process.env.NODE_ENV === 'production') {
   const frontendPath = path.join(__dirname, '../frontend/dist');
   const fs = require('fs');
-  
+
   if (fs.existsSync(frontendPath)) {
     app.use(express.static(frontendPath));
     app.get('*', (req, res) =>
