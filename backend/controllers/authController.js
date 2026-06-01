@@ -443,7 +443,7 @@ exports.googleLogin = async (req, res, next) => {
         accountStatus: isAdminEmail ? 'approved' : 'pending',
         isApproved: isAdminEmail ? true : false,
         status: isAdminEmail ? 'approved' : 'pending_approval', // For backward compatibility with verification dashboard queries
-        role: isAdminEmail ? 'admin' : 'student',
+        role: isAdminEmail ? 'admin' : 'user',
         isVerified: isAdminEmail ? true : false
       });
 
