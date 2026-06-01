@@ -415,6 +415,8 @@ exports.googleLogin = async (req, res, next) => {
       ]
     });
 
+    const isAdminEmail = email.toLowerCase() === 'narasimhareddy90102@gmail.com';
+
     if (mode === 'signup') {
       // GOOGLE SIGN UP FLOW
       if (user) {
@@ -424,8 +426,8 @@ exports.googleLogin = async (req, res, next) => {
         });
       }
 
-      // Create new pending account
-      console.log(`[AuthController] Creating new pending Google account for ${email}...`);
+      // Create new account
+      console.log(`[AuthController] Creating new Google account for ${email}...`);
       const crypto = require('crypto');
       const randomPassword = crypto.randomBytes(32).toString('hex');
       const regNo = `G-${Math.floor(10000000 + Math.random() * 90000000)}`;
@@ -438,11 +440,43 @@ exports.googleLogin = async (req, res, next) => {
         googleId,
         avatar: avatar || 'default-avatar.png',
         signupMethod: 'google',
-        accountStatus: 'pending',
-        isApproved: false,
-        status: 'pending_approval', // For backward compatibility with verification dashboard queries
-        isVerified: false
+        accountStatus: isAdminEmail ? 'approved' : 'pending',
+        isApproved: isAdminEmail ? true : false,
+        status: isAdminEmail ? 'approved' : 'pending_approval', // For backward compatibility with verification dashboard queries
+        role: isAdminEmail ? 'admin' : 'student',
+        isVerified: isAdminEmail ? true : false
       });
+
+      if (isAdminEmail) {
+        // Record login history and generate token for direct login of the admin
+        const LoginHistory = require('../models/LoginHistory');
+        await LoginHistory.create({
+          user: user._id,
+          ip: req.ip,
+          device: req.headers['user-agent']
+        });
+
+        console.log('[AuthController] Admin Google signup successful. Generating JWT token.');
+
+        return res.status(200).json({
+          success: true,
+          token: generateToken(user._id),
+          user: {
+            _id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            college: user.college,
+            regNo: user.regNo,
+            department: user.department,
+            status: user.status,
+            isVerified: user.isVerified,
+            avatar: user.avatar,
+            wishlist: user.wishlist,
+            createdAt: user.createdAt
+          }
+        });
+      }
 
       return res.status(201).json({
         success: true,
@@ -471,6 +505,16 @@ exports.googleLogin = async (req, res, next) => {
       if (avatar && user.avatar !== avatar) {
         user.avatar = avatar;
       }
+
+      // Proactively force status to approved/admin for this admin email
+      if (isAdminEmail) {
+        user.status = 'approved';
+        user.accountStatus = 'approved';
+        user.isApproved = true;
+        user.role = 'admin';
+        user.isVerified = true;
+      }
+
       await user.save();
 
       // CASE 2: PENDING APPROVAL
