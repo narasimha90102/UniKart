@@ -28,6 +28,7 @@ const allowedOrigins = [
   'http://localhost:3000',
   'http://10.169.56.55:5173',
   'http://192.168.238.1:5173',
+  'http://172.25.163.6:5173',
   'https://unikart-campus.vercel.app'
 ];
 

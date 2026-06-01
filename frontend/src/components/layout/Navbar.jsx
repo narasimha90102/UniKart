@@ -87,7 +87,7 @@ export function Navbar() {
           </div>
 
           {/* Mobile Search Bar */}
-          {!isAuthPage && !isAdminPage && !isNoSearchPage && (
+          {user && !isAuthPage && !isAdminPage && !isNoSearchPage && (
             <div className="flex-1 md:hidden mx-2 relative max-w-[140px] xs:max-w-[170px] sm:max-w-[210px] transition-all">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3 h-3 text-white/90" />
               <input 

@@ -203,10 +203,12 @@ export function Home() {
               See all <span className="ml-1">→</span>
             </Link>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar sm:grid sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {loading ? (
               Array.from({ length: 4 }).map((_, idx) => (
-                <ProductSkeleton key={idx} />
+                <div key={idx} className="flex-none w-[170px] xs:w-[190px] sm:w-auto">
+                  <ProductSkeleton />
+                </div>
               ))
             ) : (
               products.slice(0, 8).map((product, index) => (
@@ -216,6 +218,7 @@ export function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.05 }}
                   viewport={{ once: true }}
+                  className="flex-none w-[170px] xs:w-[190px] sm:w-auto"
                 >
                   <ProductCard product={product} />
                 </motion.div>
@@ -232,7 +235,7 @@ export function Home() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-2xl font-black text-gray-900 uppercase tracking-wide">Recently Sold</h2>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+            <div className="flex overflow-x-auto pb-4 gap-4 no-scrollbar sm:grid sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
               {soldProducts.slice(0, 8).map((product, index) => (
                 <motion.div
                   key={product._id || product.id}
@@ -240,6 +243,7 @@ export function Home() {
                   whileInView={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.4, delay: index * 0.05 }}
                   viewport={{ once: true }}
+                  className="flex-none w-[170px] xs:w-[190px] sm:w-auto"
                 >
                   <ProductCard product={product} />
                 </motion.div>

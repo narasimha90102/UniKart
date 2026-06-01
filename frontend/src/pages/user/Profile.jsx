@@ -241,7 +241,7 @@ export function Profile() {
               </div>
               <div className="text-center">
                 <h2 className="text-xl font-black text-gray-900">{user?.name}</h2>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{user?.email}</p>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] break-all">{user?.email}</p>
               </div>
             </div>
 
@@ -379,7 +379,7 @@ export function Profile() {
           </div>
           <div className="text-center">
             <h1 className="text-3xl font-black tracking-tight">{user?.name}</h1>
-            <p className="text-emerald-100 text-sm font-medium mt-1">{user?.email}</p>
+            <p className="text-emerald-100 text-sm font-medium mt-1 break-all">{user?.email}</p>
             <div className="flex flex-wrap justify-center gap-2 mt-4">
               <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-lg text-[10px] font-black uppercase tracking-widest">{user?.role || 'Student'}</span>
               {!isAdmin && (
@@ -412,7 +412,7 @@ export function Profile() {
             </div>
             <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Email Address</p>
-              <p className="text-base font-black text-gray-900">{user?.email}</p>
+              <p className="text-base font-black text-gray-900 break-all">{user?.email}</p>
             </div>
             <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Phone Number</p>
