@@ -48,8 +48,14 @@ export function Signup() {
         callback: async (tokenResponse) => {
           if (tokenResponse && tokenResponse.access_token) {
             try {
-              await googleLogin(tokenResponse.access_token, 'signup');
-              navigate('/approval-pending');
+              const userData = await googleLogin(tokenResponse.access_token, 'signup');
+              if (userData && userData.role === 'admin') {
+                navigate('/admin/dashboard');
+              } else if (userData && userData._id) {
+                navigate('/dashboard');
+              } else {
+                navigate('/approval-pending');
+              }
             } catch (err) {
               console.error('Google backend auth error:', err);
               setErrorMsg(err.response?.data?.message || 'Authentication with Google failed.');
