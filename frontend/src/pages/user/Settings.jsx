@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
-  Shield, CreditCard, MapPin, Bell, Globe, Moon,
+  Shield, Bell, Globe, Moon,
   Lock, Smartphone, Key, Users, CheckCircle, 
   ShoppingBag, List, Heart, HelpCircle, 
   AlertCircle, Info, 
@@ -17,8 +17,6 @@ import { PrivacyModal } from '../../components/settings/PrivacyModal';
 import { NotificationModal } from '../../components/settings/NotificationModal';
 import { ThemeModal, LanguageModal } from '../../components/settings/PreferencesModals';
 import { ManageDevicesModal, LoginActivityModal, TwoFAModal, BlockedUsersModal } from '../../components/settings/SecurityModals';
-import { AddressModal } from '../../components/settings/AddressModal';
-import { PaymentModal } from '../../components/settings/PaymentModal';
 import { HelpCenterModal, AboutModal } from '../../components/settings/HelpModals';
 
 // Modal key → component mapping
@@ -32,17 +30,36 @@ const MODALS = {
   loginActivity: LoginActivityModal,
   twoFA: TwoFAModal,
   blockedUsers: BlockedUsersModal,
-  address: AddressModal,
-  payment: PaymentModal,
   helpCenter: HelpCenterModal,
   about: AboutModal,
 };
 
 export function Settings() {
   const { logout, user } = useAuth();
-  const { currentLanguage, isDark } = useTheme();
+  const { currentLanguage, isDark, t } = useTheme();
   const navigate = useNavigate();
   const [activeModal, setActiveModal] = useState(null);
+  const scrollPositionRef = useRef(0);
+
+  useEffect(() => {
+    if (activeModal) {
+      // Capture and save the exact scroll position when a sub-page/modal opens
+      scrollPositionRef.current = window.pageYOffset || document.documentElement.scrollTop;
+    } else {
+      // Restore the exact scroll position when the modal is closed
+      const savedScrollY = scrollPositionRef.current;
+      if (savedScrollY > 0) {
+        // Small delay to allow the DOM/animation to settle smoothly
+        const timer = setTimeout(() => {
+          window.scrollTo({
+            top: savedScrollY,
+            behavior: 'instant'
+          });
+        }, 10);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [activeModal]);
 
   const open = (key) => setActiveModal(key);
   const close = () => setActiveModal(null);
@@ -102,60 +119,56 @@ export function Settings() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="max-w-2xl mx-auto pb-24">
       <div className="flex items-center justify-between mb-8 px-2">
         <div>
-          <h1 className="text-3xl font-black text-gray-900 tracking-tighter">Settings</h1>
-          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-1">Manage your UniKart experience</p>
+          <h1 className="text-3xl font-black text-gray-900 tracking-tighter">{t('settings')}</h1>
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-1">{t('manageExperience')}</p>
         </div>
       </div>
 
       {/* General */}
-      <SettingSection title="General" items={[
-        { label: 'Edit Profile', desc: 'Name, photo, college and bio', icon: Edit, path: '/dashboard/profile' },
-        { label: 'Change Password', desc: 'Update your login credentials', icon: Key, modal: 'changePassword' },
-        { label: 'Privacy Center', desc: 'Control your visibility and data', icon: Shield, modal: 'privacy' },
-        { label: 'Notification Settings', desc: 'Manage alerts and messages', icon: Bell, modal: 'notifications' },
-        { label: 'Language', desc: 'Select your preferred language', icon: Globe, modal: 'language', value: currentLanguage.label },
-        { label: 'Theme / Dark Mode', desc: 'Personalize your interface', icon: Moon, modal: 'theme', value: isDark ? 'Dark' : 'Light' },
+      <SettingSection title={t('general')} items={[
+        { label: t('editProfile'), desc: t('editProfileDesc'), icon: Edit, path: '/dashboard/profile' },
+        { label: t('changePassword'), desc: t('changePasswordDesc'), icon: Key, modal: 'changePassword' },
+        { label: t('privacyCenter'), desc: t('privacyCenterDesc'), icon: Shield, modal: 'privacy' },
+        { label: t('notificationSettings'), desc: t('notificationSettingsDesc'), icon: Bell, modal: 'notifications' },
+        { label: t('language'), desc: t('languageDesc'), icon: Globe, modal: 'language', value: currentLanguage.label },
+        { label: t('themeMode'), desc: t('themeModeDesc'), icon: Moon, modal: 'theme', value: isDark ? t('darkMode') : t('lightMode') },
       ]} />
 
       {/* Security */}
-      <SettingSection title="Security" items={[
-        { label: 'Manage Devices', desc: 'View and logout from other devices', icon: Smartphone, modal: 'devices' },
-        { label: 'Login Activity', desc: 'Recent login locations and times', icon: History, modal: 'loginActivity' },
-        { label: 'Two-Factor Authentication', desc: 'Add extra layer of security', icon: Lock, modal: 'twoFA', value: user?.twoFA ? 'ON' : 'OFF' },
-        { label: 'Blocked Users', desc: 'Manage your blocked list', icon: Users, modal: 'blockedUsers' },
+      <SettingSection title={t('securitySection')} items={[
+        { label: t('manageDevicesLabel'), desc: t('manageDevicesDesc'), icon: Smartphone, modal: 'devices' },
+        { label: t('loginActivityLabel'), desc: t('loginActivityDesc'), icon: History, modal: 'loginActivity' },
+        { label: t('twoFactorAuth'), desc: t('twoFactorAuthDesc'), icon: Lock, modal: 'twoFA', value: user?.twoFA ? 'ON' : 'OFF' },
+        { label: t('blockedUsersLabel'), desc: t('blockedUsersDesc'), icon: Users, modal: 'blockedUsers' },
         ...( user?.role !== 'admin' && user?.isVerified ? [{
-          label: 'Account Verification',
-          desc: 'Verified campus student',
+          label: t('accountVerification'),
+          desc: t('accountVerificationDesc'),
           icon: CheckCircle,
-          value: 'Verified',
+          value: t('verifiedLabel'),
           path: '/dashboard/profile'
         }] : []),
       ]} />
 
       {/* Marketplace */}
-      <SettingSection title="Marketplace" items={[
-        { label: 'My Orders', desc: 'Track and manage your purchases', icon: ShoppingBag, path: '/dashboard/orders' },
-        { label: 'My Listings', desc: 'Manage your active products', icon: List, path: '/sell' },
-        { label: 'Wishlist', desc: 'Items you have saved for later', icon: Heart, path: '/dashboard/wishlist' },
-        { label: 'Payment Settings', desc: 'UPI IDs and payment methods', icon: CreditCard, modal: 'payment' },
-        { label: 'Address Management', desc: 'Campus delivery locations', icon: MapPin, modal: 'address' },
+      <SettingSection title={t('marketplaceSection')} items={[
+        { label: t('myOrders'), desc: t('myOrdersDesc'), icon: ShoppingBag, path: '/dashboard/orders' },
+        { label: t('myListings'), desc: t('myListingsDesc'), icon: List, path: '/sell' },
+        { label: t('wishlist'), desc: t('wishlistDesc'), icon: Heart, path: '/dashboard/wishlist' },
       ]} />
 
       {/* Support */}
-      <SettingSection title="Support & Feedback" items={[
-        { label: 'Help Center & FAQs', desc: 'Guides, FAQs and contact support', icon: HelpCircle, modal: 'helpCenter' },
-        { label: 'Report a Problem', desc: 'Technical issues or safety concerns', icon: AlertCircle, modal: 'helpCenter' },
-        { label: 'About UniKart', desc: 'Version 2.1.0 · Production', icon: Info, modal: 'about' },
+      <SettingSection title={t('supportFeedback')} items={[
+        { label: t('helpCenterFaqs'), desc: t('helpCenterDesc'), icon: HelpCircle, modal: 'helpCenter' },
+        { label: t('reportProblem'), desc: t('reportProblemDesc'), icon: AlertCircle, modal: 'helpCenter' },
+        { label: t('aboutUniKart'), desc: t('aboutDesc'), icon: Info, modal: 'about' },
       ]} />
 
       {/* Danger Zone — Logout Only */}
-      <SettingSection title="Danger Zone" items={[
-        { label: 'Sign Out', desc: 'Securely logout from this device', icon: LogOut, onClick: handleLogout, danger: true },
+      <SettingSection title={t('dangerZone')} items={[
+        { label: t('signOut'), desc: t('signOutDesc'), icon: LogOut, onClick: handleLogout, danger: true },
       ]} />
 
-      <div className="text-center py-6">
-        <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">UniKart • v2.1.0 • Campus Certified</p>
-      </div>
+
 
       {/* Render Active Modal */}
       <AnimatePresence>

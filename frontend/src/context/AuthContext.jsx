@@ -25,6 +25,23 @@ export function AuthProvider({ children }) {
     return userData;
   };
 
+  const googleLogin = async (accessToken, mode = 'login') => {
+    const response = await api.post('/auth/google', { access_token: accessToken, mode });
+    
+    if (response.data.status === 'pending_approval' || !response.data.token) {
+      return response.data;
+    }
+
+    const { token, user: userData } = response.data;
+    
+    // Store user data
+    setUser(userData);
+    localStorage.setItem('unikart_user', JSON.stringify(userData));
+    localStorage.setItem('unikart_token', token);
+    
+    return userData;
+  };
+
   const signup = async (userData) => {
     const response = await api.post('/auth/register', userData);
     const data = response.data;
@@ -40,6 +57,7 @@ export function AuthProvider({ children }) {
   const value = React.useMemo(() => ({ 
     user, 
     login, 
+    googleLogin,
     signup, 
     logout, 
     setUser 

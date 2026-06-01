@@ -32,3 +32,33 @@ exports.createOrder = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get user payments (both sent and received)
+// @route   GET /api/orders/my-payments
+// @access  Private
+exports.getMyPayments = async (req, res, next) => {
+  try {
+    const userId = req.user.id;
+    // Payments made (purchases)
+    const purchases = await Order.find({ user: userId })
+      .populate('product', 'title images price')
+      .populate('seller', 'name email')
+      .sort('-createdAt');
+
+    // Payments received (sales)
+    const sales = await Order.find({ seller: userId })
+      .populate('product', 'title images price')
+      .populate('user', 'name email')
+      .sort('-createdAt');
+
+    res.status(200).json({
+      success: true,
+      data: {
+        purchases,
+        sales
+      }
+    });
+  } catch (error) {
+    next(error);
+  }
+};

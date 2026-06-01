@@ -19,13 +19,26 @@ import {
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { ProductCard } from '../../components/shared/ProductCard';
+import { ProductSkeleton } from '../../components/shared/ProductSkeleton';
 import { useProducts } from '../../hooks/useProducts';
 import { useCategories } from '../../hooks/useCategories';
+import { useTheme } from '../../context/ThemeContext';
 
 export function Marketplace() {
+  const { t } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const [products, fetchProducts, loading] = useProducts();
   const [categories] = useCategories();
+
+  const getCategoryTranslation = (name) => {
+    if (name === 'Books') return t('catBooks');
+    if (name === 'Electronics') return t('catElectronics');
+    if (name === 'Gadgets') return t('catGadgets');
+    if (name === 'Furniture') return t('catFurniture');
+    if (name === 'Hostel') return t('catHostel');
+    if (name === 'Clothing') return t('catClothing');
+    return name;
+  };
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [viewMode, setViewMode] = useState('grid');
@@ -105,7 +118,7 @@ export function Marketplace() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div>
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">Campus Marketplace</h1>
+              <h1 className="text-3xl font-black text-gray-900 tracking-tight mb-2">{t('marketplace')}</h1>
               <p className="text-gray-500 font-medium">Find exactly what you need from your fellow students.</p>
             </div>
             
@@ -115,7 +128,7 @@ export function Marketplace() {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search products..."
+                placeholder={t('searchPlaceholder')}
                 className="w-full h-12 pl-12 pr-4 rounded-xl border border-gray-200 focus:border-[#1B8C50] focus:ring-4 focus:ring-[#1B8C50]/10 outline-none transition-all"
               />
             </form>
@@ -131,7 +144,7 @@ export function Marketplace() {
             <div className="sticky top-24 space-y-8">
               {/* Category Filter */}
               <div>
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">Categories</h3>
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">{t('categories')}</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => handleCategoryChange('All')}
@@ -141,7 +154,7 @@ export function Marketplace() {
                       : 'text-gray-600 hover:bg-white hover:text-[#1B8C50]'
                     }`}
                   >
-                    All Categories
+                    {t('allCategories')}
                   </button>
                   {categories.map(cat => (
                     <button
@@ -153,7 +166,7 @@ export function Marketplace() {
                         : 'text-gray-600 hover:bg-white hover:text-[#1B8C50]'
                       }`}
                     >
-                      {cat.name}
+                      {getCategoryTranslation(cat.name)}
                     </button>
                   ))}
                 </div>
@@ -161,7 +174,7 @@ export function Marketplace() {
 
               {/* Price Range */}
               <div>
-                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">Price Range</h3>
+                <h3 className="text-sm font-bold text-gray-900 uppercase tracking-widest mb-4">{t('priceRange')}</h3>
                 <div className="space-y-4">
                   <input
                     type="range"
@@ -267,7 +280,7 @@ export function Marketplace() {
             {loading ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
                 {[...Array(6)].map((_, i) => (
-                  <div key={i} className="bg-white rounded-2xl h-[340px] animate-pulse border border-gray-100" />
+                  <ProductSkeleton key={i} />
                 ))}
               </div>
             ) : filteredProducts.length > 0 ? (
@@ -299,9 +312,9 @@ export function Marketplace() {
                 <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
                   <AlertCircle className="w-8 h-8 text-gray-300" />
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">No products found</h3>
+                <h3 className="text-xl font-bold text-gray-900 mb-2">{t('noProductsFound')}</h3>
                 <p className="text-gray-500 max-w-xs mx-auto mb-6">
-                  Try adjusting your filters or search query to find what you're looking for.
+                  {t('noProductsFoundDesc')}
                 </p>
                 <Button 
                   variant="outline" 
@@ -313,7 +326,7 @@ export function Marketplace() {
                   }}
                   className="rounded-xl"
                 >
-                  Clear all filters
+                  {t('clearFilters')}
                 </Button>
               </div>
             )}
@@ -349,7 +362,7 @@ export function Marketplace() {
               <div className="space-y-8">
                 {/* Mobile Categories */}
                 <div>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Categories</h3>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{t('categories')}</h3>
                   <div className="flex flex-wrap gap-2">
                     <button
                       onClick={() => handleCategoryChange('All')}
@@ -359,7 +372,7 @@ export function Marketplace() {
                         : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                       }`}
                     >
-                      All
+                      {t('allCategories')}
                     </button>
                     {categories.map(cat => (
                       <button
@@ -371,7 +384,7 @@ export function Marketplace() {
                           : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                         }`}
                       >
-                        {cat.name}
+                        {getCategoryTranslation(cat.name)}
                       </button>
                     ))}
                   </div>
@@ -379,7 +392,7 @@ export function Marketplace() {
 
                 {/* Mobile Price */}
                 <div>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Price Range</h3>
+                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">{t('priceRange')}</h3>
                   <input
                     type="range"
                     min="0"
@@ -393,7 +406,7 @@ export function Marketplace() {
                 </div>
 
                 <Button className="w-full rounded-2xl h-14 bg-[#1B8C50]" onClick={() => setIsFilterOpen(false)}>
-                  Apply Filters
+                  {t('apply')}
                 </Button>
               </div>
             </motion.div>

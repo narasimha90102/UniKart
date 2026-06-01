@@ -65,9 +65,19 @@ exports.getHistory = async (req, res, next) => {
         { sender: user1, receiver: user2 },
         { sender: user2, receiver: user1 }
       ]
-    }).sort({ createdAt: 1 });
+    })
+    .populate('orderProduct', 'title images price status')
+    .sort({ createdAt: 1 });
 
-    const formattedMessages = messages.map(msg => ({
+    const userId = req.user.id;
+
+    // Filter out messages the requesting user has deleted for themselves
+    const visibleMessages = messages.filter(msg => {
+      const deletedForMe = msg.deletedFor && msg.deletedFor.some(id => id.toString() === userId);
+      return !deletedForMe;
+    });
+
+    const formattedMessages = visibleMessages.map(msg => ({
       _id: msg._id,
       senderId: msg.sender,
       receiverId: msg.receiver,
@@ -76,7 +86,13 @@ exports.getHistory = async (req, res, next) => {
       room: room,
       createdAt: msg.createdAt,
       read: msg.read,
-      isDeleted: msg.isDeleted
+      isDeleted: msg.isDeleted,
+      isOrderRequest: msg.isOrderRequest || false,
+      orderProduct: msg.orderProduct || null,
+      orderPrice: msg.orderPrice || null,
+      orderStatus: msg.orderStatus || 'pending',
+      isReviewRequest: msg.isReviewRequest || false,
+      reviewOrderId: msg.reviewOrderId || null
     }));
 
     res.status(200).json({ success: true, data: formattedMessages });
@@ -145,27 +161,33 @@ exports.getUnreadCount = async (req, res, next) => {
   }
 };
 
-// @desc    Delete a message
+// @desc    Delete a message (for the requesting user only)
 // @route   DELETE /api/chat/message/:id
 // @access  Private
 exports.deleteMessage = async (req, res, next) => {
   try {
+    const userId = req.user.id;
     const message = await Message.findById(req.params.id);
 
     if (!message) {
       return res.status(404).json({ success: false, message: 'Message not found' });
     }
 
-    if (message.sender.toString() !== req.user.id) {
+    // Both sender and receiver can delete the message for themselves
+    const isSender = message.sender.toString() === userId;
+    const isReceiver = message.receiver.toString() === userId;
+
+    if (!isSender && !isReceiver) {
       return res.status(401).json({ success: false, message: 'Not authorized to delete this message' });
     }
 
-    message.isDeleted = true;
-    message.content = 'This message was deleted';
-    message.imageUrl = null;
-    await message.save();
+    // Add userId to deletedFor array (so it's hidden only for this user)
+    await Message.findByIdAndUpdate(
+      message._id,
+      { $addToSet: { deletedFor: userId } }
+    );
 
-    res.status(200).json({ success: true, data: message });
+    res.status(200).json({ success: true, message: 'Message deleted for you' });
   } catch (error) {
     next(error);
   }
@@ -193,6 +215,55 @@ exports.deleteConversation = async (req, res, next) => {
     });
 
     res.status(200).json({ success: true, message: 'Conversation deleted' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update order request status (accept/decline)
+// @route   PUT /api/chat/order-request/:messageId
+// @access  Private
+exports.updateOrderRequest = async (req, res, next) => {
+  try {
+    const { action } = req.body; // 'accepted' or 'declined'
+    const messageId = req.params.messageId;
+
+    const message = await Message.findById(messageId);
+    if (!message) {
+      return res.status(404).json({ success: false, message: 'Message not found' });
+    }
+
+    // Only receiver (seller) can accept/decline
+    if (message.receiver.toString() !== req.user.id) {
+      return res.status(401).json({ success: false, message: 'Not authorized' });
+    }
+
+    message.orderStatus = action;
+    await message.save();
+
+    if (action === 'accepted') {
+      const Product = require('../models/Product');
+      await Product.findByIdAndUpdate(message.orderProduct, { status: 'sold' });
+
+      const Order = require('../models/Order');
+      let order = await Order.findOne({ product: message.orderProduct });
+      if (!order) {
+        order = await Order.create({
+          user: message.sender,
+          product: message.orderProduct,
+          seller: message.receiver,
+          price: message.orderPrice,
+          status: 'completed',
+          paymentMethod: 'cash'
+        });
+      }
+
+      // Automatically send review request
+      const { sendReviewRequest } = require('../utils/reviewHelper');
+      await sendReviewRequest(order);
+    }
+
+    res.status(200).json({ success: true, data: message });
   } catch (error) {
     next(error);
   }

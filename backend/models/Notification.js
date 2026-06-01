@@ -35,6 +35,16 @@ const notificationSchema = new mongoose.Schema(
     chatRoom: {
       type: String, // Room ID for deep-linking
       default: null
+    },
+    orderId: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Order',
+      default: null
+    },
+    productId: {
+      type: mongoose.Schema.ObjectId,
+      ref: 'Product',
+      default: null
     }
   },
   { timestamps: true }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, MapPin, Plus, Edit3, Trash2, Home, Building2, CheckCircle } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../utils/api';
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const panelVariants = {
@@ -72,11 +73,16 @@ export function AddressModal({ onClose }) {
   const [view, setView] = useState('list'); // list | add | edit
   const [editTarget, setEditTarget] = useState(null);
 
-  const persist = (updated) => {
+  const persist = async (updated) => {
     setAddresses(updated);
     const u = { ...user, addresses: updated };
     setUser(u);
     localStorage.setItem('unikart_user', JSON.stringify(u));
+    try {
+      await api.put('/users/profile', { addresses: updated });
+    } catch (err) {
+      console.error('Failed to sync addresses with backend:', err);
+    }
   };
 
   const addAddress = (form) => {

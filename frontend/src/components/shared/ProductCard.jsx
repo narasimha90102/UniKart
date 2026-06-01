@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
 import { Heart, MapPin, Clock } from 'lucide-react';
@@ -7,8 +7,9 @@ import { Card } from '../ui/Card';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
-export function ProductCard({ product }) {
+export const ProductCard = memo(function ProductCard({ product }) {
   const { user, setUser } = useAuth();
+  const [avatarError, setAvatarError] = React.useState(false);
   const isLiked = user?.wishlist?.includes(product._id);
 
   const handleLike = async (e) => {
@@ -29,105 +30,151 @@ export function ProductCard({ product }) {
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
     : 0;
 
-  const conditionColor = (product.condition || 'New').includes('New') 
-    ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
-    : (product.condition || '').includes('Used')
-      ? 'bg-orange-50 text-orange-600 border-orange-100'
-      : 'bg-blue-50 text-blue-600 border-blue-100';
+  // Render condition styling
+  let conditionClass = 'bg-gray-50 text-gray-600 border-gray-100';
+  const cond = (product.condition || '').toLowerCase();
+  if (cond.includes('new')) {
+    conditionClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  } else if (cond.includes('like')) {
+    conditionClass = 'bg-blue-50 text-blue-600 border-blue-100';
+  } else if (cond.includes('good')) {
+    conditionClass = 'bg-amber-50 text-amber-700 border-amber-100';
+  } else if (cond.includes('fair')) {
+    conditionClass = 'bg-orange-50 text-orange-700 border-orange-100';
+  }
+
+  // Get initials for avatar fallback
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
+  // List of avatar background colors for visual aesthetics
+  const getAvatarBg = (name) => {
+    if (!name) return 'bg-emerald-600';
+    const charCode = name.charCodeAt(0) + (name.charCodeAt(1) || 0);
+    const colors = [
+      'bg-blue-600',
+      'bg-emerald-600',
+      'bg-indigo-600',
+      'bg-purple-600',
+      'bg-sky-600',
+      'bg-teal-600',
+      'bg-cyan-600',
+      'bg-amber-600'
+    ];
+    return colors[charCode % colors.length];
+  };
+
+  const sellerName = product.seller?.name || 'Campus Peer';
+  const initials = getInitials(sellerName);
+  const avatarBg = getAvatarBg(sellerName);
 
   return (
     <motion.div whileHover={{ y: -4 }} transition={{ duration: 0.2 }} className="h-full">
       <Link to={`/product/${product._id}`} className="block h-full">
-        <Card className="overflow-hidden group h-full flex flex-col bg-white border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-gray-200/40 transition-all rounded-[1.5rem]">
+        <Card className="overflow-hidden group h-full flex flex-col bg-white border border-gray-150 shadow-sm hover:shadow-md hover:border-gray-200 transition-all rounded-[1rem] p-2.5">
           {/* Image Container */}
-          <div className="relative aspect-square overflow-hidden bg-gray-50">
+          <div className="relative aspect-square overflow-hidden bg-gray-50 rounded-lg">
             <img 
               src={product.images?.[0] || product.image} 
               alt={product.title} 
-              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+              loading="lazy"
+              decoding="async"
+              className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
             />
             
+            {product.status === 'sold' && (
+              <div className="absolute inset-0 bg-black/25 flex items-center justify-center z-10 backdrop-blur-[0.5px]">
+                <span className="bg-white/95 text-gray-900 text-[11px] font-black px-4 py-1.5 rounded-xl uppercase tracking-widest shadow-md border border-gray-100/50">
+                  SOLD
+                </span>
+              </div>
+            )}
+            
             {/* Badges Overlay */}
-            <div className="absolute top-3 left-3 flex flex-col gap-1.5">
+            <div className="absolute top-2 left-2">
               {discount > 0 && (
-                <div className="bg-red-500 text-white text-[9px] font-black px-2 py-1 rounded-lg shadow-lg">
-                  {discount}% OFF
-                </div>
-              )}
-              {product.featured && (
-                <div className="bg-primary text-white text-[9px] font-black px-2 py-1 rounded-lg shadow-lg">
-                  FEATURED
+                <div className="bg-red-500 text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full shadow-sm">
+                  -{discount}%
                 </div>
               )}
             </div>
             
             {/* Wishlist Button */}
             <button 
-              className="absolute top-3 right-3 rounded-xl w-8 h-8 flex items-center justify-center bg-white/80 backdrop-blur-md shadow-lg hover:bg-white transition-all active:scale-90"
+              className="absolute top-2 right-2 rounded-full w-7 h-7 flex items-center justify-center bg-white/90 backdrop-blur-sm shadow-sm hover:bg-white transition-all active:scale-90"
               onClick={handleLike}
             >
-              <Heart className={`w-4 h-4 transition-colors ${isLiked ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+              <Heart className={`w-3.5 h-3.5 transition-colors ${isLiked ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
             </button>
-
-            {/* Bottom Info Bar Overlay */}
-            <div className="absolute bottom-0 left-0 right-0 p-3 bg-gradient-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-              <div className="flex items-center gap-2 text-white">
-                <img 
-                  src={product.seller?.avatar || `https://ui-avatars.com/api/?name=${product.seller?.name || 'S'}&background=1B8C50&color=fff`} 
-                  className="w-5 h-5 rounded-full border border-white/20" 
-                />
-                <span className="text-[9px] font-bold truncate">Seller: {product.seller?.name || 'Campus Peer'}</span>
-              </div>
-            </div>
           </div>
           
-          <div className="p-4 flex-1 flex flex-col">
-            <div className="flex justify-between items-start gap-2 mb-1.5">
-              <h3 className="font-black text-gray-900 text-[13px] leading-tight line-clamp-2 flex-1">
-                {product.title}
-              </h3>
+          <div className="pt-2 pb-0.5 flex-1 flex flex-col">
+            <h3 className="font-bold text-gray-900 text-[14px] leading-snug line-clamp-1 mb-0.5">
+              {product.title}
+            </h3>
+
+            <div className="flex items-baseline gap-1.5 mb-1.5">
+              <span className="text-base font-black text-gray-900 tracking-tight">₹{product.price}</span>
+              {product.originalPrice && (
+                <span className="text-[12px] text-gray-400 line-through font-medium">₹{product.originalPrice}</span>
+              )}
             </div>
 
-            <div className="flex items-center gap-2 mb-1.5">
-               <span className={`text-[8px] font-black px-2 py-0.5 rounded-full border uppercase tracking-tighter ${conditionColor}`}>
+            <div className="flex items-center justify-between gap-2 mb-2">
+              <span className={`text-[10px] font-bold px-2 py-0.25 rounded-full border uppercase tracking-tighter ${conditionClass}`}>
                 {product.condition || 'New'}
               </span>
-              <span className="text-[10px] font-bold text-gray-400">•</span>
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{product.category}</span>
+              <span className="text-[11px] font-medium text-gray-400 uppercase tracking-wider truncate max-w-[80px]">
+                {product.category}
+              </span>
             </div>
             
-            {/* Always-visible Seller Info */}
-            <div className="flex items-center gap-1.5 mb-3">
-              <img 
-                src={product.seller?.avatar || `https://ui-avatars.com/api/?name=${product.seller?.name || 'S'}&background=1B8C50&color=fff`} 
-                className="w-[18px] h-[18px] rounded-full border border-gray-100 shrink-0 object-cover" 
-                alt={product.seller?.name || 'Seller'}
-              />
-              <span className="text-[10px] font-bold text-gray-500 truncate">By {product.seller?.name || 'Campus Peer'}</span>
-            </div>
+            <hr className="border-gray-100 my-1.5" />
             
-            <div className="mt-auto">
-              <div className="flex items-baseline gap-1.5 mb-2">
-                <span className="text-lg font-black text-gray-900 tracking-tight">₹{product.price}</span>
-                {product.originalPrice && (
-                  <span className="text-xs text-gray-400 line-through font-medium">₹{product.originalPrice}</span>
+            <div className="flex items-center justify-between mt-auto pt-1">
+              <Link 
+                to={`/user/${product.seller?._id || product.seller}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 min-w-0 hover:text-primary transition-all cursor-pointer group"
+              >
+                {product.seller?.avatar && product.seller.avatar !== 'default-avatar.png' && !avatarError ? (
+                  <img 
+                    src={product.seller.avatar} 
+                    className="w-5 h-5 rounded-full border border-gray-100 shrink-0 object-cover group-hover:scale-105 transition-transform" 
+                    alt={sellerName}
+                    onError={() => setAvatarError(true)}
+                  />
+                ) : (
+                  <div className={`w-5 h-5 rounded-full ${avatarBg} text-white font-bold flex items-center justify-center text-[10px] uppercase select-none shrink-0 group-hover:scale-105 transition-transform`}>
+                    {initials}
+                  </div>
                 )}
-              </div>
+                <span className="text-[13px] font-semibold text-gray-600 truncate group-hover:text-primary transition-colors">{sellerName}</span>
+              </Link>
               
-              <div className="flex items-center justify-between pt-2 border-t border-gray-50">
-                <div className="flex items-center gap-1 text-gray-400">
-                  <MapPin className="w-3 h-3" />
-                  <span className="text-[10px] font-bold truncate max-w-[80px]">{product.location || 'Campus'}</span>
-                </div>
-                <div className="flex items-center gap-1 text-gray-400">
-                  <Clock className="w-3 h-3" />
-                  <span className="text-[10px] font-bold">{formatDistanceToNow(product.createdAt)}</span>
-                </div>
-              </div>
+              {product.status === 'sold' ? (
+                <span className="text-[11px] font-bold text-gray-500 whitespace-nowrap bg-gray-50 px-2 py-0.5 rounded border border-gray-150 shadow-2xs">
+                  Sold: {new Date(product.updatedAt || product.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric'
+                  })}
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">
+                  {formatDistanceToNow(product.createdAt)}
+                </span>
+              )}
             </div>
           </div>
         </Card>
       </Link>
     </motion.div>
   );
-}
+});

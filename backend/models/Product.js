@@ -66,6 +66,10 @@ const productSchema = new mongoose.Schema(
     featured: {
       type: Boolean,
       default: false
+    },
+    reviewCount: {
+      type: Number,
+      default: 0
     }
   },
   { timestamps: true }
@@ -73,5 +77,7 @@ const productSchema = new mongoose.Schema(
 
 // Add index for searching
 productSchema.index({ title: 'text', description: 'text' });
+productSchema.index({ status: 1, createdAt: -1 });
+productSchema.index({ category: 1, status: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Product', productSchema);

@@ -1,107 +1,346 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { MapPin, Star, Calendar, MessageCircle, ShieldCheck } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { MapPin, Star, Calendar, MessageCircle, ShieldCheck, Award, TrendingUp, Sparkles, MessageSquare, CheckCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { ProductCard } from '../../components/shared/ProductCard';
-import { products } from '../../data/mockData';
+import api from '../../utils/api';
+import { useAuth } from '../../context/AuthContext';
 
 export function SellerProfile() {
-  const { name } = useParams();
-  const decodedName = decodeURIComponent(name || 'Unknown Seller');
+  const { name: sellerId } = useParams();
+  const { user: currentUser } = useAuth();
   
-  // Find all products by this seller
-  const sellerProducts = products.filter(p => p.seller === decodedName);
-  
-  // Mock some stats
-  const joinedDate = 'August 2023';
-  const totalSales = Math.floor(Math.random() * 20) + 5;
-  const rating = (Math.random() * (5.0 - 4.2) + 4.2).toFixed(1);
+  const [seller, setSeller] = useState(null);
+  const [products, setProducts] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('listings'); // 'listings' | 'reviews'
+
+  useEffect(() => {
+    const fetchSellerData = async () => {
+      setLoading(true);
+      setError('');
+      try {
+        // 1. Fetch user profile
+        const userRes = await api.get(`/users/${sellerId}`);
+        const sellerData = userRes.data.data;
+        setSeller(sellerData);
+
+        const realId = sellerData._id;
+
+        // 2. Fetch seller reviews
+        const reviewsRes = await api.get(`/reviews/seller/${realId}`);
+        setReviews(reviewsRes.data.data || []);
+
+        // 3. Fetch active listings for this seller
+        const productsRes = await api.get(`/products?seller=${realId}`);
+        // Filter out deleted/moderated products, allow available/active
+        const sellerActiveListings = (productsRes.data.data || []).filter(
+          p => p.status === 'active' || p.status === 'available'
+        );
+        setProducts(sellerActiveListings);
+      } catch (err) {
+        console.error('Failed to load seller profile:', err);
+        setError('Seller profile could not be retrieved. They may not exist or have deactivated.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (sellerId) {
+      fetchSellerData();
+    }
+  }, [sellerId]);
+
+  if (loading) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-gray-400 font-bold animate-pulse text-sm uppercase tracking-widest">Retrieving Campus Seller...</p>
+      </div>
+    );
+  }
+
+  if (error || !seller) {
+    return (
+      <div className="max-w-md mx-auto text-center py-20 px-6">
+        <div className="w-20 h-20 bg-red-50 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+          <span className="text-red-500 text-3xl">⚠️</span>
+        </div>
+        <h2 className="text-2xl font-black text-gray-900 mb-2">Error</h2>
+        <p className="text-sm text-gray-500 mb-6">{error || 'User not found.'}</p>
+        <Link to="/dashboard">
+          <Button rounded="xl">Return to Dashboard</Button>
+        </Link>
+      </div>
+    );
+  }
+
+  // Get initials for avatar fallback
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
+  const sellerName = seller.name || 'Unknown Seller';
+  const joinedDate = seller.createdAt 
+    ? new Date(seller.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : 'August 2023';
+
+  // Statistics from backend user controller
+  const stats = seller.stats || {
+    rating: seller.ratings?.average || 0.0,
+    totalReviews: reviews.length,
+    productsSold: 0,
+    completedOrders: 0
+  };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-      <div className="flex flex-col md:flex-row gap-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 pt-24 min-h-[85vh]">
+      <div className="flex flex-col lg:flex-row gap-8 items-start">
         
-        {/* Left Sidebar - Profile Info */}
-        <aside className="w-full md:w-80 shrink-0">
+        {/* Left Sidebar - Profile Info Card */}
+        <aside className="w-full lg:w-80 shrink-0">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-panel rounded-3xl p-8 sticky top-24 shadow-xl border border-gray-100"
+            className="bg-white rounded-[2.5rem] p-8 sticky top-24 border border-gray-100 shadow-xl shadow-gray-200/50"
           >
             <div className="flex flex-col items-center text-center">
-              <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-green-300 flex items-center justify-center text-5xl font-bold text-white shadow-lg shadow-primary/20 mb-6">
-                {decodedName.charAt(0).toUpperCase()}
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-1">{decodedName}</h1>
-              <p className="text-gray-500 mb-4 flex items-center gap-1 justify-center">
-                <MapPin className="w-4 h-4" /> Campus Campus
+              {seller.avatar && seller.avatar !== 'default-avatar.png' ? (
+                <img 
+                  src={seller.avatar} 
+                  alt={sellerName}
+                  className="w-32 h-32 rounded-full object-cover shadow-lg border-2 border-primary/10 mb-6"
+                />
+              ) : (
+                <div className="w-32 h-32 rounded-full bg-gradient-to-br from-primary to-green-300 flex items-center justify-center text-5xl font-black text-white shadow-lg shadow-primary/20 mb-6 select-none">
+                  {getInitials(sellerName)}
+                </div>
+              )}
+              
+              <h1 className="text-2xl font-black text-gray-900 mb-1 tracking-tight truncate w-full" title={sellerName}>
+                {sellerName}
+              </h1>
+              <p className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-1 justify-center">
+                <MapPin className="w-3.5 h-3.5 text-gray-300" /> Saveetha Campus
               </p>
               
-              <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-full text-green-700 text-sm font-medium mb-6">
-                <ShieldCheck className="w-4 h-4" /> Verified Student
+              <div className="flex items-center gap-2 px-4 py-1.5 bg-emerald-50 text-emerald-700 text-xs font-extrabold uppercase rounded-full mb-6 border border-emerald-100">
+                <ShieldCheck className="w-3.5 h-3.5" /> Verified Student
               </div>
 
-              <div className="w-full grid grid-cols-2 gap-4 border-y border-gray-100 py-6 mb-6">
-                <div>
-                  <div className="text-2xl font-bold text-gray-900 flex items-center justify-center gap-1">
-                    {rating} <Star className="w-5 h-5 text-yellow-400 fill-current" />
+              {/* Statistics Grid */}
+              <div className="w-full grid grid-cols-2 gap-x-4 gap-y-6 border-y border-gray-100 py-6 mb-6">
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900 flex items-center justify-center gap-1">
+                    {stats.totalReviews > 0 ? stats.rating.toFixed(1) : '0.0'} <Star className="w-4 h-4 text-amber-400 fill-current shrink-0" />
                   </div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">Rating</p>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Seller Rating</p>
+                  {stats.totalReviews === 0 && (
+                    <span className="text-[9px] font-extrabold text-gray-400 block mt-0.5 lowercase">(0 reviews)</span>
+                  )}
                 </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">{totalSales}</div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mt-1">Items Sold</p>
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">{reviews.length}</div>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Total Reviews</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">{stats.productsSold}</div>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Products Sold</p>
+                </div>
+                <div className="text-center">
+                  <div className="text-xl font-black text-gray-900">{stats.completedOrders}</div>
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mt-1">Completed Deals</p>
                 </div>
               </div>
 
+              {/* Joined Date & Direct Messaging */}
               <div className="w-full space-y-4 text-left">
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Calendar className="w-5 h-5 text-gray-400" />
-                  Joined {joinedDate}
+                <div className="flex items-center gap-3 text-xs font-bold text-gray-500 bg-gray-50 p-3 rounded-2xl border border-gray-100">
+                  <Calendar className="w-4 h-4 text-gray-400" />
+                  <span>Joined {joinedDate}</span>
                 </div>
                 
-                <Link to="/dashboard/chat" className="block w-full mt-4">
-                  <Button className="w-full rounded-xl" size="lg">
-                    <MessageCircle className="w-5 h-5 mr-2" /> Message Seller
-                  </Button>
-                </Link>
+                {currentUser && currentUser._id !== seller._id && (
+                  <Link 
+                    to="/dashboard/chat" 
+                    state={{ 
+                      sellerId: seller._id,
+                      sellerName: sellerName,
+                      sellerAvatar: seller.avatar,
+                    }}
+                    className="block w-full"
+                  >
+                    <Button className="w-full h-12 rounded-xl text-xs font-black uppercase tracking-wider shadow-md shadow-primary/10" size="lg">
+                      <MessageCircle className="w-4.5 h-4.5 mr-2" /> Message Seller
+                    </Button>
+                  </Link>
+                )}
               </div>
             </div>
           </motion.div>
         </aside>
 
-        {/* Right Content - Listings */}
-        <main className="flex-1">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-          >
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-2xl font-bold text-gray-900">Active Listings</h2>
-              <span className="bg-gray-100 text-gray-700 px-3 py-1 rounded-full text-sm font-medium">
-                {sellerProducts.length} Items
-              </span>
-            </div>
+        {/* Right Content Area - Tabs (Listings & Reviews) */}
+        <main className="flex-1 w-full">
+          <div className="flex gap-2 border-b border-gray-100 mb-8 pb-3">
+            <button 
+              onClick={() => setActiveTab('listings')}
+              className={`px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'listings' 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              📦 Active Listings ({products.length})
+            </button>
+            <button 
+              onClick={() => setActiveTab('reviews')}
+              className={`px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-xl transition-all flex items-center gap-2 ${
+                activeTab === 'reviews' 
+                  ? 'bg-primary/10 text-primary' 
+                  : 'text-gray-400 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              💬 Buyer Feedback ({reviews.length})
+            </button>
+          </div>
 
-            {sellerProducts.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {sellerProducts.map(product => (
-                  <ProductCard key={product.id} product={product} />
-                ))}
-              </div>
+          <AnimatePresence mode="wait">
+            {activeTab === 'listings' ? (
+              <motion.div 
+                key="listings"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                {products.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {products.map(product => (
+                      <ProductCard key={product._id || product.id} product={product} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-[2.5rem] p-16 text-center border border-gray-100 shadow-sm">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <span className="text-gray-300 text-2xl">📦</span>
+                    </div>
+                    <h3 className="text-lg font-black text-gray-900 mb-1">No Active Listings</h3>
+                    <p className="text-sm text-gray-400">This student currently has no active items for sale.</p>
+                  </div>
+                )}
+              </motion.div>
             ) : (
-              <div className="glass-panel rounded-3xl p-12 text-center">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-gray-400 text-3xl">📦</span>
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">No Active Listings</h3>
-                <p className="text-gray-500">This user currently has no items for sale.</p>
-              </div>
+              <motion.div 
+                key="reviews"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-4"
+              >
+                {reviews.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-4">
+                    {reviews.map((review) => (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.98 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        key={review._id} 
+                        className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm flex flex-col sm:flex-row gap-4 justify-between"
+                      >
+                        <div className="flex gap-4 items-start">
+                          <Link 
+                            to={`/user/${review.buyer?.name || review.buyer?._id}`}
+                            className="shrink-0 cursor-pointer group/avatar"
+                          >
+                            {review.buyer?.avatar && review.buyer.avatar !== 'default-avatar.png' ? (
+                              <img 
+                                src={review.buyer.avatar} 
+                                alt={review.buyer.name} 
+                                className="w-12 h-12 rounded-full object-cover border border-gray-100 group-hover/avatar:scale-105 transition-transform"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-emerald-50 text-primary flex items-center justify-center font-black text-base select-none group-hover/avatar:scale-105 transition-transform">
+                                {getInitials(review.buyer?.name)}
+                              </div>
+                            )}
+                          </Link>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center gap-2">
+                              <Link 
+                                to={`/user/${review.buyer?.name || review.buyer?._id}`}
+                                className="font-extrabold text-gray-900 text-sm leading-none hover:text-primary transition-colors hover:underline"
+                              >
+                                {review.buyer?.name || 'Anonymous Buyer'}
+                              </Link>
+                              <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Verified Buyer</span>
+                            </div>
+                            
+                            {/* Stars row */}
+                            <div className="flex items-center gap-0.5">
+                              {Array.from({ length: 5 }).map((_, starIndex) => (
+                                <Star 
+                                  key={starIndex}
+                                  className={`w-3.5 h-3.5 ${
+                                    starIndex < review.rating 
+                                      ? 'text-amber-400 fill-current' 
+                                      : 'text-gray-200'
+                                  }`} 
+                                />
+                              ))}
+                            </div>
+
+                            <p className="text-sm font-medium text-gray-600 leading-relaxed mt-1">
+                              "{review.reviewText}"
+                            </p>
+
+                            {/* Review optional images */}
+                            {review.images && review.images.length > 0 && (
+                              <div className="flex gap-2 mt-3 flex-wrap">
+                                {review.images.map((imgUrl, imgIdx) => (
+                                  <a key={imgIdx} href={imgUrl} target="_blank" rel="noreferrer" className="w-16 h-16 rounded-xl overflow-hidden border border-gray-100 block shrink-0 bg-gray-50">
+                                    <img src={imgUrl} alt="review attachment" className="w-full h-full object-cover hover:scale-105 transition-transform" />
+                                  </a>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Order info details right aligned */}
+                        <div className="sm:text-right flex flex-col justify-between items-start sm:items-end border-t sm:border-t-0 border-gray-50 pt-4 sm:pt-0 shrink-0">
+                          <div>
+                            <span className="text-[10px] font-bold text-gray-400 block uppercase tracking-widest">Reviewed Item</span>
+                            <span className="text-xs font-black text-gray-700 block max-w-[200px] truncate">{review.product?.title || 'Campus Item'}</span>
+                          </div>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase mt-2 sm:mt-0">
+                            {new Date(review.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                          </span>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-white rounded-[2.5rem] p-16 text-center border border-gray-100 shadow-sm">
+                    <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <MessageSquare className="w-7 h-7 text-gray-300" />
+                    </div>
+                    <h3 className="text-lg font-black text-gray-900 mb-1">No Reviews Yet</h3>
+                    <p className="text-sm text-gray-400">Buyers will submit feedback once orders are completed/delivered.</p>
+                  </div>
+                )}
+              </motion.div>
             )}
-          </motion.div>
+          </AnimatePresence>
         </main>
+
       </div>
     </div>
   );

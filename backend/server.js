@@ -7,6 +7,7 @@ const rateLimit = require('express-rate-limit');
 const http = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const compression = require('compression');
 
 const connectDB = require('./config/db');
 const errorHandler = require('./middleware/error');
@@ -25,6 +26,8 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://127.0.0.1:5173',
   'http://localhost:3000',
+  'http://10.169.56.55:5173',
+  'http://192.168.238.1:5173',
   'https://unikart-campus.vercel.app'
 ];
 
@@ -48,6 +51,9 @@ require('./config/socket')(io); // Mount socket logic
 
 // Body parser
 app.use(express.json());
+
+// Enable response compression (gzip)
+app.use(compression());
 
 // Dev logging middleware
 if (process.env.NODE_ENV !== 'production') {
@@ -80,6 +86,7 @@ app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/admin', require('./routes/adminRoutes'));
 app.use('/api/chat', require('./routes/chatRoutes'));
 app.use('/api/orders', require('./routes/orderRoutes'));
+app.use('/api/reviews', require('./routes/reviewRoutes'));
 app.use('/api/support', require('./routes/supportRoutes'));
 
 // Health check endpoint

@@ -6,7 +6,8 @@ const {
   forgotPassword,
   resetPassword,
   validateEmail,
-  verifyOtp
+  verifyOtp,
+  googleLogin
 } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.post('/register', register);
 router.post('/login', login);
+router.post('/google', googleLogin);
 router.post('/validate-email', validateEmail);
 router.post('/verify-otp', verifyOtp);
 router.post('/forgotpassword', forgotPassword);

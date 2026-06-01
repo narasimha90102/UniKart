@@ -1,22 +1,62 @@
 import React from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Heart, MessageCircle, Share2, MapPin, ShieldCheck, ShoppingCart } from 'lucide-react';
-import { Button } from '../../components/ui/Button';
-import { Badge } from '../../components/ui/Badge';
-import { useCart } from '../../context/CartContext';
+import { Heart, MessageCircle, Share2, MapPin, Clock, Eye, Package, ArrowLeft, ShoppingCart, CreditCard } from 'lucide-react';
+import { formatDistanceToNow } from '../../utils/formatDate';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
+import { useCart } from '../../context/CartContext';
 
 export function ProductDetails() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addToCart } = useCart();
-  const { user } = useAuth();
+
   const [product, setProduct] = React.useState(null);
   const [loading, setLoading] = React.useState(true);
-  const [adding, setAdding] = React.useState(false);
-  const [buying, setBuying] = React.useState(false);
+  const [isAdding, setIsAdding] = React.useState(false);
+  const [copied, setCopied] = React.useState(false);
+  const { user, setUser } = useAuth();
+
+  const isLiked = React.useMemo(() => user?.wishlist?.includes(product?._id), [user, product]);
+
+  const debounceRef = React.useRef(null);
+
+  const handleLike = React.useCallback(async (e) => {
+    e.stopPropagation();
+    e.preventDefault();
+    if (!user) return alert('Please login to wishlist items');
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await api.post(`/users/wishlist/${product?._id}`);
+        const updatedWishlist = res.data.data;
+        const updatedUser = { ...user, wishlist: updatedWishlist };
+        setUser(updatedUser);
+        localStorage.setItem('unikart_user', JSON.stringify(updatedUser));
+      } catch (err) {
+        console.error('Error toggling wishlist:', err);
+      }
+    }, 250);
+  }, [user, product, setUser]);
+
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleAddToCart = async () => {
+    setIsAdding(true);
+    try {
+      await addToCart(product._id);
+      alert('Product successfully added to your cart!');
+    } catch (err) {
+      console.error('Add to cart failed', err);
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
   React.useEffect(() => {
     const fetchProduct = async () => {
@@ -32,160 +72,238 @@ export function ProductDetails() {
     fetchProduct();
   }, [id]);
 
-  const handleBuy = () => {
-    if (!product || isSold) return;
-    navigate(`/checkout/${id}`);
-  };
-
   if (loading) return <div className="p-20 text-center text-primary font-bold text-2xl animate-pulse">Loading Product...</div>;
   if (!product) return (
     <div className="p-20 text-center space-y-4">
       <h2 className="text-red-500 font-bold text-2xl">Product not found.</h2>
       <Link to="/dashboard">
-        <Button variant="outline" className="rounded-xl">Return to Dashboard</Button>
+        <button className="px-6 py-2 border-2 border-gray-200 rounded-xl hover:bg-gray-50 transition-all font-bold">Return to Dashboard</button>
       </Link>
     </div>
   );
 
-  const isSold = product.status === 'sold';
+  const discount = product.originalPrice 
+    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100) 
+    : 0;
+
+  // Render condition styling
+  let conditionClass = 'bg-gray-50 text-gray-600 border-gray-100';
+  const cond = (product.condition || '').toLowerCase();
+  if (cond.includes('new')) {
+    conditionClass = 'bg-emerald-50 text-emerald-700 border-emerald-100';
+  } else if (cond.includes('like')) {
+    conditionClass = 'bg-blue-50 text-blue-600 border-blue-100';
+  } else if (cond.includes('good')) {
+    conditionClass = 'bg-amber-50 text-amber-700 border-amber-100';
+  } else if (cond.includes('fair')) {
+    conditionClass = 'bg-orange-50 text-orange-700 border-orange-100';
+  }
+
+  // Get initials for avatar fallback
+  const getInitials = (name) => {
+    if (!name) return 'U';
+    const parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return `${parts[0].charAt(0)}${parts[1].charAt(0)}`.toUpperCase();
+    }
+    return name.charAt(0).toUpperCase();
+  };
+
+  const sellerName = product.seller?.name || 'Campus Peer';
+
+  // Dynamic Views count based on product ID
+  const viewsCount = (id ? id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % 15 : 5) + 3;
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      {/* Breadcrumbs */}
-      <nav className="text-sm text-gray-400 mb-6 flex items-center gap-2">
-        <Link to="/" className="hover:text-white transition-colors">Home</Link>
-        <span>/</span>
-        <Link to="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>
-        <span>/</span>
-        <Link to={`/dashboard?category=${product.category}`} className="hover:text-white transition-colors">{product.category}</Link>
-        <span>/</span>
-        <span className="text-gray-200 truncate max-w-[200px]">{product.title}</span>
-      </nav>
+    <div className="max-w-5xl mx-auto px-4 py-6 w-full lg:h-[calc(100vh-100px)] flex flex-col justify-start lg:justify-center overflow-hidden">
+      {/* Back to shop */}
+      <div className="mb-4 shrink-0">
+        <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-[13px] font-black text-gray-500 hover:text-gray-900 transition-colors uppercase tracking-wider">
+          <ArrowLeft className="w-4 h-4" /> Back to shop
+        </Link>
+      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-        {/* Image Gallery */}
-        <div className="relative">
-          {isSold && (
-            <div className="absolute top-6 left-6 z-10 bg-red-600 text-white font-black px-6 py-2 rounded-full shadow-2xl rotate-[-5deg] border-2 border-white tracking-widest text-sm uppercase">
-              Out of Stock / Sold
-            </div>
-          )}
-          <div className="space-y-4">
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className={`aspect-[4/3] rounded-2xl overflow-hidden glass-card border-white/10 ${isSold ? 'grayscale opacity-50' : ''}`}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-12 items-center flex-1 min-h-0">
+        {/* Left Column: Image */}
+        <div className="relative h-full flex items-center justify-center max-h-[420px] lg:max-h-[480px]">
+          <div className="relative w-full aspect-square max-w-[420px] lg:max-w-[480px] rounded-3xl overflow-hidden border border-gray-200/80 shadow-md bg-gray-50 flex items-center justify-center">
+            <img 
+              src={product.images?.[0] || product.image} 
+              alt={product.title} 
+              className="w-full h-full object-cover" 
+            />
+            {discount > 0 && (
+              <div className="absolute top-4 left-4 bg-red-500 text-white text-[11px] font-black px-3 py-1 rounded-full shadow-md tracking-wider">
+                -{discount}% OFF
+              </div>
+            )}
+            
+            <button 
+              onClick={handleLike}
+              className="absolute top-4 right-4 w-9 h-9 rounded-full bg-white/90 backdrop-blur-sm shadow-md flex items-center justify-center hover:bg-white transition-all active:scale-90 border border-gray-100"
             >
-              <img src={product.images?.[0]} alt={product.title} className="w-full h-full object-cover" />
-            </motion.div>
-            <div className="grid grid-cols-4 gap-4">
-              {product.images?.map((img, i) => (
-                <div key={i} className={`aspect-square rounded-xl overflow-hidden cursor-pointer border-2 transition-all ${i === 0 ? 'border-primary' : 'border-transparent hover:border-white/20'}`}>
-                  <img src={img} alt={`Gallery ${i}`} className="w-full h-full object-cover opacity-80 hover:opacity-100" />
-                </div>
-              ))}
-            </div>
+              <Heart className={`w-4 h-4 transition-colors ${isLiked ? 'text-red-500 fill-current' : 'text-gray-400'}`} />
+            </button>
           </div>
         </div>
 
-        {/* Product Info */}
-        <div className="flex flex-col">
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="space-y-6"
+        {/* Right Column: Info */}
+        <div className="flex flex-col justify-between h-full py-1 max-h-[420px] lg:max-h-[480px] space-y-4">
+          <div className="space-y-1">
+            <span className="text-[10px] font-black uppercase tracking-widest text-primary block">
+              {product.category}
+            </span>
+            <h1 className="text-2xl lg:text-3xl font-black text-gray-900 leading-tight tracking-tight">
+              {product.title}
+            </h1>
+          </div>
+
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-black text-gray-900">₹{product.price}</span>
+            {product.originalPrice && (
+              <span className="text-base text-gray-400 line-through font-semibold">₹{product.originalPrice}</span>
+            )}
+          </div>
+
+          {/* Badges/Pills Row */}
+          <div className="flex flex-wrap gap-1.5">
+            <span className={`text-[10px] font-extrabold px-3 py-1 rounded-full border uppercase tracking-wider ${conditionClass}`}>
+              {product.condition || 'New'}
+            </span>
+            
+            <span className="text-[10px] font-bold px-3 py-1 rounded-full border border-gray-200 bg-gray-50/50 text-gray-500 flex items-center gap-1.5">
+              <MapPin className="w-3 h-3" />
+              {product.seller?.college?.split(' ')[0]?.toLowerCase() || 'mit.edu'}
+            </span>
+
+            <span className="text-[10px] font-bold px-3 py-1 rounded-full border border-gray-200 bg-gray-50/50 text-gray-500 flex items-center gap-1.5">
+              <Clock className="w-3 h-3" />
+              Posted {formatDistanceToNow(product.createdAt)}
+            </span>
+
+            {/* Views counter (Cool Professional Feature 1) */}
+            <span className="text-[10px] font-bold px-3 py-1 rounded-full border border-emerald-100 bg-emerald-50/50 text-emerald-700 flex items-center gap-1.5 shrink-0">
+              <Eye className="w-3.5 h-3.5" />
+              {viewsCount} viewed today
+            </span>
+          </div>
+
+          {/* Description Card */}
+          <div className="bg-gray-50/70 rounded-2xl p-4 border border-gray-200/50 shadow-sm">
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1.5 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5" />
+              Description
+            </h3>
+            <p className="text-[13px] font-medium text-gray-600 leading-relaxed max-h-[85px] overflow-y-auto no-scrollbar">
+              {product.description || 'No description provided by the seller.'}
+            </p>
+          </div>
+
+          {/* Seller Card */}
+          <Link 
+            to={`/user/${product.seller?.name || product.seller?._id || product.seller}`}
+            className="bg-white rounded-2xl p-3.5 border border-gray-250/50 shadow-sm flex items-center gap-3 hover:border-primary/20 transition-all cursor-pointer group/card w-full"
           >
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className={`text-3xl sm:text-4xl font-bold mb-2 ${isSold ? 'text-gray-500' : ''}`}>{product.title}</h1>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="text-yellow-500 flex items-center gap-1">★ {product.rating || '4.5'}</span>
-                  <span className="text-gray-400 underline cursor-pointer">{product.reviews || '12'} reviews</span>
-                  <span className="text-gray-600">•</span>
-                  <span className="text-gray-400">Condition: <strong className="text-white">{product.condition}</strong></span>
-                </div>
+            {product.seller?.avatar && product.seller.avatar !== 'default-avatar.png' ? (
+              <img 
+                src={product.seller.avatar} 
+                className="w-10 h-10 rounded-full border border-gray-150 shrink-0 object-cover group-hover/card:scale-105 transition-transform" 
+                alt={sellerName}
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#007AFF] text-white font-black flex items-center justify-center text-sm uppercase shadow-sm group-hover/card:scale-105 transition-transform shrink-0">
+                {getInitials(sellerName)}
               </div>
-              <Button variant="glass" size="icon" className="shrink-0 rounded-full w-12 h-12">
-                <Heart className="w-5 h-5 text-gray-300" />
-              </Button>
+            )}
+            <div>
+              <h4 className="font-bold text-gray-900 text-sm group-hover/card:text-primary transition-colors">{sellerName}</h4>
+              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block">Seller (View Profile)</span>
             </div>
+            <div className="ml-auto flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded-full shrink-0">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Active</span>
+            </div>
+          </Link>
 
-            <div className="glass-panel rounded-2xl p-6 border-white/5 space-y-4">
-              <div className="flex items-end gap-3">
-                <span className={`text-4xl font-extrabold ${isSold ? 'text-gray-500 line-through' : 'text-white'}`}>₹{product.price}</span>
-                {product.originalPrice && (
-                  <span className="text-xl text-gray-500 line-through mb-1">₹{product.originalPrice}</span>
-                )}
-                {isSold ? (
-                  <Badge variant="outline" className="mb-2 text-red-500 border-red-500/20 bg-red-500/5">SOLD OUT</Badge>
-                ) : product.originalPrice && (
-                  <Badge variant="destructive" className="mb-2">
-                    {Math.round((1 - product.price / product.originalPrice) * 100)}% OFF
-                  </Badge>
-                )}
-              </div>
-              
-              {!isSold && (
-                <p className="text-sm text-green-400 flex items-center gap-1">
-                  <ShieldCheck className="w-4 h-4" /> 100% Secure Transaction
-                </p>
-              )}
+          {/* Button row */}
+          <div className="space-y-2">
+            {product.status === 'sold' ? (
+              <button disabled className="w-full bg-red-50 text-red-500 font-black text-xs uppercase tracking-wider py-4 px-6 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed border border-red-100">
+                Sold Out
+              </button>
+            ) : user && (typeof product.seller === 'object' ? product.seller?._id : product.seller) !== user._id ? (
+              <>
+                {/* Main Action Buttons */}
+                <div className="flex gap-2">
+                  {/* Buy Now */}
+                  <Link to={`/checkout/${product._id}`} className="flex-1">
+                    <button className="w-full bg-[#1B8C50] hover:bg-[#157040] text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-md shadow-[#1B8C50]/15 active:scale-[0.99] transition-all">
+                      <CreditCard className="w-4 h-4" /> Buy Now
+                    </button>
+                  </Link>
 
-              <div className="flex flex-col sm:flex-row gap-3 pt-4">
-                <Button 
-                  size="lg" 
-                  className={`flex-1 rounded-full text-base ${isSold ? 'bg-gray-700 text-gray-500 cursor-not-allowed' : 'bg-primary hover:bg-primary-dark'}`}
-                  onClick={handleBuy}
-                  disabled={buying || isSold}
-                >
-                  {isSold ? 'Out of Stock' : (buying ? 'Processing...' : 'Buy Now')}
-                </Button>
-                {user && (typeof product.seller === 'object' ? product.seller?._id : product.seller) !== user._id && (
+                  {/* Add to Cart */}
+                  <button 
+                    onClick={handleAddToCart}
+                    disabled={isAdding}
+                    className="flex-1 bg-white hover:bg-gray-50 text-[#1B8C50] border-2 border-[#1B8C50] font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 active:scale-[0.99] transition-all disabled:opacity-50"
+                  >
+                    <ShoppingCart className="w-4 h-4" /> {isAdding ? 'Adding...' : 'Add to Cart'}
+                  </button>
+                </div>
+
+                {/* Sub Action Buttons */}
+                <div className="flex gap-2">
                   <Link 
                     to="/dashboard/chat" 
                     state={{ 
                       sellerId: typeof product.seller === 'object' ? product.seller?._id : product.seller,
-                      sellerName: typeof product.seller === 'object' ? product.seller?.name : 'Seller', 
-                      sellerAvatar: `https://ui-avatars.com/api/?name=${(typeof product.seller === 'object' ? product.seller?.name : 'Seller')}&background=1B8C50&color=fff`,
+                      sellerName: sellerName, 
+                      sellerAvatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sellerName)}&background=1B8C50&color=fff`,
                       productTitle: product.title
                     }} 
                     className="flex-1"
                   >
-                    <Button variant="outline" size="lg" className="w-full rounded-full text-base border-white/20">
-                      <MessageCircle className="w-5 h-5 mr-2" /> Chat with Seller
-                    </Button>
+                    <button className="w-full bg-[#007AFF] hover:bg-[#0072E5] text-white font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 shadow-sm hover:shadow active:scale-[0.99] transition-all">
+                      <MessageCircle className="w-4 h-4" /> Message Seller
+                    </button>
                   </Link>
-                )}
-              </div>
-            </div>
 
-            <div className="space-y-4">
-              <h3 className="text-xl font-semibold border-b border-white/10 pb-2">Description</h3>
-              <p className="text-gray-300 leading-relaxed">
-                {product.description}
-                <br/><br/>
-                Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.
-              </p>
-            </div>
-
-            <div className="glass-card rounded-2xl p-6 flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-blue-400 to-indigo-600 flex items-center justify-center text-xl font-bold">
-                {product.seller?.name?.[0] || '?'}
+                  {/* Share button */}
+                  <button 
+                    onClick={handleShare}
+                    className="w-12 h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center transition-all border border-gray-200/50 shadow-sm shrink-0 relative"
+                    title="Share Product"
+                  >
+                    {copied && (
+                      <span className="absolute -top-9 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-md whitespace-nowrap z-10">
+                        Copied!
+                      </span>
+                    )}
+                    <Share2 className="w-4.5 h-4.5" />
+                  </button>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <button disabled className="flex-1 bg-gray-150 text-gray-400 font-black text-xs uppercase tracking-wider py-3.5 px-6 rounded-2xl flex items-center justify-center gap-2 cursor-not-allowed">
+                  This is your product
+                </button>
+                <button 
+                  onClick={handleShare}
+                  className="w-12 h-12 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 hover:text-gray-900 flex items-center justify-center transition-all border border-gray-200/50 shadow-sm shrink-0 relative"
+                  title="Share Product"
+                >
+                  {copied && (
+                    <span className="absolute -top-9 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow-md whitespace-nowrap z-10">
+                      Copied!
+                    </span>
+                  )}
+                  <Share2 className="w-4.5 h-4.5" />
+                </button>
               </div>
-              <div className="flex-1">
-                <h4 className="font-semibold text-lg">{product.seller?.name || 'Unknown Seller'}</h4>
-                <p className="text-sm text-gray-400 flex items-center gap-1 mt-1">
-                  <MapPin className="w-4 h-4" /> {product.seller?.college || 'Saveetha Engineering College'}
-                </p>
-              </div>
-              <Link to={`/user/${encodeURIComponent(product.seller?.name || 'seller')}`}>
-                <Button variant="outline" size="sm" className="rounded-full hover:bg-primary hover:text-white hover:border-primary transition-colors">
-                  View Profile
-                </Button>
-              </Link>
-            </div>
-            
-          </motion.div>
+            )}
+          </div>
         </div>
       </div>
     </div>

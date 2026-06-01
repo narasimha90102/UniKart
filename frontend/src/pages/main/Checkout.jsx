@@ -10,7 +10,7 @@ export function Checkout() {
   const navigate = useNavigate();
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedMethod, setSelectedMethod] = useState(null);
+  const [selectedMethod, setSelectedMethod] = useState('cash');
   const [isProcessing, setIsProcessing] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
@@ -29,33 +29,26 @@ export function Checkout() {
   }, [id]);
 
   const paymentMethods = [
-    { id: 'gpay', name: 'Google Pay', icon: Smartphone, color: 'bg-blue-50 text-blue-600' },
-    { id: 'phonepe', name: 'PhonePe', icon: Wallet, color: 'bg-purple-50 text-purple-600' },
-    { id: 'paytm', name: 'Paytm', icon: CreditCard, color: 'bg-cyan-50 text-cyan-600' },
-    { id: 'cash', name: 'Cash on Delivery', icon: Banknote, color: 'bg-green-50 text-green-600' },
+    { id: 'cash', name: 'Cash on Delivery / Meetup', icon: Banknote, color: 'bg-green-50 text-green-600' },
   ];
 
   const handlePayment = async () => {
     if (!selectedMethod) return;
     setIsProcessing(true);
     
-    // Simulate payment processing
-    setTimeout(async () => {
-      try {
-        await api.put(`/products/${id}`, { status: 'sold' });
-        await api.post('/orders', {
-          product: id,
-          seller: product.seller?._id || product.seller,
-          price: product.price,
-          paymentMethod: selectedMethod
-        });
-        setIsSuccess(true);
-        setTimeout(() => navigate('/dashboard'), 3000);
-      } catch (err) {
-        alert('Payment processing failed. Please try again.');
-        setIsProcessing(false);
-      }
-    }, 2000);
+    // Smooth transition to direct chat-negotiation flow
+    setTimeout(() => {
+      navigate('/dashboard/chat', { 
+        state: { 
+          sellerId: product.seller?._id || product.seller, 
+          sellerName: product.seller?.name || 'Seller', 
+          sendOrderRequest: true,
+          productId: product._id,
+          productPrice: product.price,
+          productTitle: product.title
+        } 
+      });
+    }, 1500);
   };
 
   if (loading) return <div className="min-h-screen flex items-center justify-center text-primary font-bold">Loading Secure Checkout...</div>;
@@ -120,7 +113,7 @@ export function Checkout() {
                       size="lg" 
                       className="w-full h-14 rounded-2xl text-lg font-black shadow-lg shadow-primary/20"
                     >
-                      {isProcessing ? 'Processing Securely...' : `Pay ₹${product.price} Now`}
+                      {isProcessing ? 'Connecting with Seller...' : `Request Meetup Collection (₹${product.price})`}
                     </Button>
                   </div>
                 </div>

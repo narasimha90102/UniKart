@@ -194,6 +194,17 @@ export function NotificationProvider({ children }) {
     }
   }, []);
 
+  // Delete a single notification
+  const deleteNotification = useCallback(async (notifId) => {
+    try {
+      // Optimistic update
+      setNotifications(prev => prev.filter(n => n._id !== notifId && n.id !== notifId));
+      await api.delete(`/notifications/${notifId}`);
+    } catch (err) {
+      console.error('[Notifications] deleteNotification failed', err);
+    }
+  }, []);
+
   // Legacy: called when entering chat page to clear message badge
   const markMessagesAsRead = useCallback(() => {
     setChatUnreadCounts({});
@@ -216,6 +227,7 @@ export function NotificationProvider({ children }) {
     markNotificationAsRead,
     markMessagesAsRead,
     clearAllNotifications,
+    deleteNotification,
     dismissToast,
   }), [
     notifications, 
@@ -229,6 +241,7 @@ export function NotificationProvider({ children }) {
     markNotificationAsRead,
     markMessagesAsRead, 
     clearAllNotifications, 
+    deleteNotification,
     dismissToast
   ]);
 

@@ -53,6 +53,32 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: 'default-avatar.png' // URL or file path
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true
+    },
+    signupMethod: {
+      type: String,
+      enum: ['email', 'google'],
+      default: 'email'
+    },
+    accountStatus: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    isApproved: {
+      type: Boolean,
+      default: false
+    },
+    approvedAt: {
+      type: Date
+    },
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
     role: {
       type: String,
       enum: ['user', 'admin'],
@@ -121,8 +147,47 @@ const userSchema = new mongoose.Schema(
     twoFA: { type: Boolean, default: false },
     addresses: { type: Array, default: [] },
     paymentMethods: { type: Array, default: [] },
+    blockedUsers: { type: Array, default: [] },
+    language: { type: String, default: 'en' },
     lastLogin: Date,
-    verifiedAt: Date
+    verifiedAt: Date,
+    dob: {
+      type: Date
+    },
+    gender: {
+      type: String,
+      enum: ['male', 'female', 'other', 'prefer_not_to_say', ''],
+      default: ''
+    },
+    address: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    state: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    city: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    pincode: {
+      type: String,
+      trim: true,
+      default: ''
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['incomplete', 'pending', 'verified'],
+      default: 'incomplete'
+    },
+    profileCompletionPercentage: {
+      type: Number,
+      default: 0
+    }
   },
   { 
     timestamps: true, // Automatically manages createdAt and updatedAt
@@ -134,10 +199,46 @@ const userSchema = new mongoose.Schema(
 // Encrypt password before saving
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) {
-    next();
+    return next();
   }
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
+});
+
+// Calculate profile completion percentage and verification status dynamically before saving
+userSchema.pre('save', function (next) {
+  const requiredFields = [
+    { key: 'name', check: (val) => !!val && val.trim() !== '' },
+    { key: 'email', check: (val) => !!val && val.trim() !== '' },
+    { key: 'phoneNumber', check: (val) => !!val && val.trim() !== '' },
+    { key: 'dob', check: (val) => !!val },
+    { key: 'gender', check: (val) => !!val && val.trim() !== '' },
+    { key: 'avatar', check: (val) => !!val && val !== 'default-avatar.png' && val.trim() !== '' },
+    { key: 'address', check: (val) => !!val && val.trim() !== '' }
+  ];
+
+  let completedCount = 0;
+  requiredFields.forEach(field => {
+    if (field.check(this[field.key])) {
+      completedCount++;
+    }
+  });
+
+  const percentage = Math.round((completedCount / requiredFields.length) * 100);
+  this.profileCompletionPercentage = percentage;
+
+  if (percentage === 100) {
+    this.isVerified = true;
+    this.verificationStatus = 'verified';
+    if (!this.verifiedAt) {
+      this.verifiedAt = new Date();
+    }
+  } else {
+    this.isVerified = false;
+    this.verificationStatus = percentage >= 50 ? 'pending' : 'incomplete';
+  }
+
+  next();
 });
 
 // Instance method to check password

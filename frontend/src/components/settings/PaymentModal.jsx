@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CreditCard, Plus, Trash2, CheckCircle, Smartphone, Building2, Wallet } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
+import api from '../../utils/api';
 
 const backdropVariants = { hidden: { opacity: 0 }, visible: { opacity: 1 } };
 const panelVariants = {
@@ -85,11 +86,16 @@ export function PaymentModal({ onClose }) {
   const [methods, setMethods] = useState(user?.paymentMethods || []);
   const [view, setView] = useState('list'); // list | add
 
-  const persist = (updated) => {
+  const persist = async (updated) => {
     setMethods(updated);
     const u = { ...user, paymentMethods: updated };
     setUser(u);
     localStorage.setItem('unikart_user', JSON.stringify(u));
+    try {
+      await api.put('/users/profile', { paymentMethods: updated });
+    } catch (err) {
+      console.error('Failed to sync payment methods with backend:', err);
+    }
   };
 
   const addMethod = (m) => {

@@ -55,6 +55,33 @@ function PasswordStrength({ password }) {
   );
 }
 
+function PasswordField({ label, field, placeholder, form, show, toggle }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>
+      <div className="relative">
+        <input
+          type={show[field] ? 'text' : 'password'}
+          value={form[field]}
+          onChange={e => {
+            const val = e.target.value;
+            form.onChange(field, val);
+          }}
+          placeholder={placeholder}
+          className="w-full h-14 px-5 pr-14 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all"
+        />
+        <button
+          type="button"
+          onClick={() => toggle(field)}
+          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors"
+        >
+          {show[field] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export function ChangePasswordModal({ onClose }) {
   const [form, setForm] = useState({ current: '', newPass: '', confirm: '' });
   const [show, setShow] = useState({ current: false, newPass: false, confirm: false });
@@ -63,6 +90,12 @@ export function ChangePasswordModal({ onClose }) {
   const [success, setSuccess] = useState(false);
 
   const toggle = (field) => setShow(s => ({ ...s, [field]: !s[field] }));
+  const handleFieldChange = (field, val) => setForm(f => ({ ...f, [field]: val }));
+
+  const formHelper = {
+    ...form,
+    onChange: handleFieldChange
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -88,28 +121,6 @@ export function ChangePasswordModal({ onClose }) {
       setLoading(false);
     }
   };
-
-  const PasswordField = ({ label, field, placeholder }) => (
-    <div className="space-y-1.5">
-      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>
-      <div className="relative">
-        <input
-          type={show[field] ? 'text' : 'password'}
-          value={form[field]}
-          onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
-          placeholder={placeholder}
-          className="w-full h-14 px-5 pr-14 rounded-2xl bg-gray-50 border border-gray-100 text-sm font-bold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all"
-        />
-        <button
-          type="button"
-          onClick={() => toggle(field)}
-          className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-600 transition-colors"
-        >
-          {show[field] ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
-        </button>
-      </div>
-    </div>
-  );
 
   return (
     <AnimatePresence>
@@ -149,12 +160,12 @@ export function ChangePasswordModal({ onClose }) {
             </motion.div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
-              <PasswordField label="Current Password" field="current" placeholder="Your current password" />
+              <PasswordField label="Current Password" field="current" placeholder="Your current password" form={formHelper} show={show} toggle={toggle} />
               <div>
-                <PasswordField label="New Password" field="newPass" placeholder="Create a strong password" />
+                <PasswordField label="New Password" field="newPass" placeholder="Create a strong password" form={formHelper} show={show} toggle={toggle} />
                 <PasswordStrength password={form.newPass} />
               </div>
-              <PasswordField label="Confirm New Password" field="confirm" placeholder="Repeat new password" />
+              <PasswordField label="Confirm New Password" field="confirm" placeholder="Repeat new password" form={formHelper} show={show} toggle={toggle} />
 
               {error && (
                 <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}

@@ -105,7 +105,7 @@ exports.createUser = async (req, res, next) => {
       college: college || 'University Campus',
       department: department || '',
       status: status || 'approved',
-      isVerified: true
+      isVerified: false
     });
 
     // Remove password from output
@@ -267,9 +267,18 @@ exports.handleVerification = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid status. Use approved or rejected.' });
     }
 
+    const updateFields = {
+      status,
+      isVerified: status === 'approved',
+      accountStatus: status === 'approved' ? 'approved' : 'rejected',
+      isApproved: status === 'approved',
+      approvedAt: status === 'approved' ? Date.now() : undefined,
+      approvedBy: status === 'approved' ? req.user._id : undefined
+    };
+
     const user = await User.findByIdAndUpdate(
       req.params.id, 
-      { status, isVerified: status === 'approved' }, 
+      updateFields, 
       { new: true }
     ).select('-password');
 
@@ -277,23 +286,16 @@ exports.handleVerification = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Record when it was verified
+    // Send Welcome Email in background to avoid blocking the HTTP response
     if (status === 'approved') {
-      user.verifiedAt = Date.now();
-      await user.save();
-
-      // Send Welcome Email
-      try {
-        await sendEmail({
-          email: user.email,
-          subject: 'Welcome to UniKart - Your Account is Approved!',
-          html: welcomeTemplate(user.name)
-        });
-      } catch (err) {
-        console.error('Welcome email failed:', err.message);
-      }
+      sendEmail({
+        email: user.email,
+        subject: 'Welcome to UniKart - Your Account is Approved!',
+        html: welcomeTemplate(user.name)
+      }).catch((err) => {
+        console.error('Welcome email failed in background:', err.message);
+      });
     }
-
 
     res.json({ 
       success: true, 

@@ -9,9 +9,17 @@ export function useCategories() {
     try {
       setLoading(true);
       const res = await api.get('/products/categories');
-      // The API returns an array of strings, but the UI expects objects with 'id' and 'name'
-      // to maintain compatibility with existing code.
-      const formatted = res.data.data.map((cat, index) => ({
+      const categoriesList = [...res.data.data];
+      const sportsIndex = categoriesList.findIndex(c => c.toLowerCase() === 'sports');
+      const othersIndex = categoriesList.findIndex(c => c.toLowerCase() === 'others' || c.toLowerCase() === 'other');
+      
+      if (sportsIndex !== -1 && othersIndex !== -1) {
+        const temp = categoriesList[sportsIndex];
+        categoriesList[sportsIndex] = categoriesList[othersIndex];
+        categoriesList[othersIndex] = temp;
+      }
+
+      const formatted = categoriesList.map((cat, index) => ({
         id: index + 1,
         name: cat
       }));

@@ -38,6 +38,11 @@ export function Sell() {
     return () => window.removeEventListener('products-updated', fetchMyProducts);
   }, [user?._id]);
 
+  // Always start at top of page when navigating to Sell
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, []);
+
   const activeProducts = myProducts.filter(p => p.status === 'active');
   const soldProducts = myProducts.filter(p => p.status === 'sold');
   const [loading, setLoading] = useState(false);
@@ -59,20 +64,57 @@ export function Sell() {
     reason: '',
   });
 
-  const handleImageChange = (e) => {
+  const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.7) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(img.src);
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/webp', quality));
+      };
+      img.onerror = (err) => reject(err);
+    });
+  };
+
+  const handleImageChange = async (e) => {
     const files = Array.from(e.target.files);
     if (images.length + files.length > 5) {
       alert('Maximum 5 images allowed');
       return;
     }
 
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImages(prev => [...prev, reader.result]);
-      };
-      reader.readAsDataURL(file);
-    });
+    setLoading(true);
+    try {
+      const compressedUrls = await Promise.all(
+        files.map(file => compressImage(file))
+      );
+      setImages(prev => [...prev, ...compressedUrls]);
+    } catch (err) {
+      console.error('Failed to compress image:', err);
+      alert('Failed to process image');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const removeImage = (index) => {
@@ -107,18 +149,18 @@ export function Sell() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 md:py-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-[2.5rem] p-8 md:p-12 shadow-2xl shadow-gray-200/50 border border-gray-100"
+        className="bg-white rounded-[2rem] p-5 md:p-8 shadow-xl shadow-gray-200/40 border border-gray-100"
       >
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-black text-gray-900 mb-2 tracking-tighter">Sell Your Gear</h1>
-          <p className="text-gray-500 font-medium tracking-tight">Post your item to the campus marketplace in seconds.</p>
+        <div className="mb-5 text-center">
+          <h1 className="text-2xl md:text-4xl font-black text-gray-900 mb-1 tracking-tighter">Sell Your Gear</h1>
+          <p className="text-sm text-gray-500 font-medium tracking-tight">Post your item to the campus marketplace in seconds.</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-10">
+        <form onSubmit={handleSubmit} className="space-y-5">
           {/* Images Section */}
           <div className="space-y-4">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Product Images (Max 5)</label>
@@ -136,7 +178,7 @@ export function Sell() {
                     <button 
                       type="button"
                       onClick={() => removeImage(i)}
-                      className="absolute top-2 right-2 p-1.5 bg-white/90 backdrop-blur-md rounded-full text-red-500 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      className="absolute top-2 right-2 p-1.5 bg-white/95 rounded-full text-red-500 shadow-md md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10 active:scale-90"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -164,7 +206,7 @@ export function Sell() {
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Item Title</label>
               <Input 
@@ -192,7 +234,7 @@ export function Sell() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Category</label>
               <select 
@@ -262,16 +304,8 @@ export function Sell() {
 
           <div className="pt-6 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button type="button" variant="ghost" className="w-full sm:w-auto h-14 px-10 rounded-2xl font-bold" onClick={() => navigate(-1)}>Cancel</Button>
-            <Button type="submit" disabled={loading} className="w-full sm:w-auto h-14 px-12 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-2">
-              {loading ? (
-                <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Publishing...
-                </>
-              ) : 'List Product Now'}
+            <Button type="submit" loading={loading} className="w-full sm:w-auto h-14 px-12 rounded-2xl font-black text-lg bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 flex items-center justify-center gap-2">
+              List Product Now
             </Button>
           </div>
         </form>
@@ -282,7 +316,7 @@ export function Sell() {
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
-        className="mt-12 space-y-8"
+        className="mt-5 space-y-4"
       >
         <div className="flex items-center justify-between px-4">
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Marketplace Management</h2>
@@ -292,8 +326,8 @@ export function Sell() {
           </div>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-xl shadow-gray-200/40">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+        <div className="bg-white rounded-[2rem] p-5 md:p-8 border border-gray-100 shadow-xl shadow-gray-200/40">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-10">
             {/* Active Items */}
             <div className="space-y-6">
               <div className="flex items-center gap-2 mb-2">

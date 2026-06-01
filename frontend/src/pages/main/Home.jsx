@@ -4,16 +4,35 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShieldCheck, Zap, Users, TrendingUp, Star, Lock, Camera, MessageCircle } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { ProductCard } from '../../components/shared/ProductCard';
+import { ProductSkeleton } from '../../components/shared/ProductSkeleton';
 import { useCategories } from '../../hooks/useCategories';
 import { useAuth } from '../../context/AuthContext';
 import { useProducts } from '../../hooks/useProducts';
+import api from '../../utils/api';
 
 export function Home() {
   const [categories] = useCategories();
-  const [products] = useProducts();
+  const [products, , loading] = useProducts();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = React.useState('');
+  const [soldProducts, setSoldProducts] = React.useState([]);
+
+  React.useEffect(() => {
+    const fetchSoldProducts = async () => {
+      try {
+        const res = await api.get('/products?status=sold');
+        const items = res.data.data || [];
+        const fiveDaysAgo = new Date();
+        fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+        const freshSold = items.filter(p => new Date(p.updatedAt || p.createdAt) >= fiveDaysAgo);
+        setSoldProducts(freshSold);
+      } catch (err) {
+        console.error('[Home] Failed to fetch sold products:', err);
+      }
+    };
+    fetchSoldProducts();
+  }, []);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -21,6 +40,12 @@ export function Home() {
       navigate(`/dashboard?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
+
+  React.useEffect(() => {
+    if (user && window.innerWidth < 768) {
+      navigate('/dashboard', { replace: true });
+    }
+  }, [user, navigate]);
 
   return (
     <div className="pt-16 lg:pt-20 bg-[#f5fbf7]">
@@ -179,20 +204,50 @@ export function Home() {
             </Link>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {products.slice(0, 8).map((product, index) => (
-              <motion.div
-                key={product._id || product.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.05 }}
-                viewport={{ once: true }}
-              >
-                <ProductCard product={product} />
-              </motion.div>
-            ))}
+            {loading ? (
+              Array.from({ length: 4 }).map((_, idx) => (
+                <ProductSkeleton key={idx} />
+              ))
+            ) : (
+              products.slice(0, 8).map((product, index) => (
+                <motion.div
+                  key={product._id || product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                  viewport={{ once: true }}
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))
+            )}
           </div>
         </div>
       </section>
+
+      {/* Recently Sold */}
+      {soldProducts.length > 0 && (
+        <section className="py-8 bg-white border-t border-gray-100">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex items-center justify-between mb-8">
+              <h2 className="text-2xl font-black text-gray-900 uppercase tracking-wide">Recently Sold</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {soldProducts.slice(0, 8).map((product, index) => (
+                <motion.div
+                  key={product._id || product.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: index * 0.05 }}
+                  viewport={{ once: true }}
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* How UniKart Works */}
       <section className="py-20 bg-white">
@@ -201,10 +256,10 @@ export function Home() {
             <h2 className="text-3xl font-bold text-gray-900 mb-3">How UniKart Works</h2>
             <p className="text-gray-500 font-medium">Simple, safe, and campus-exclusive</p>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             <Link to={!user ? "/signup" : "/dashboard/profile"} className="group">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 text-center flex flex-col items-center cursor-pointer hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 h-full"
@@ -219,9 +274,9 @@ export function Home() {
                 </p>
               </motion.div>
             </Link>
-            
+
             <Link to="/dashboard" className="group">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 text-center flex flex-col items-center cursor-pointer hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 h-full"
@@ -236,9 +291,9 @@ export function Home() {
                 </p>
               </motion.div>
             </Link>
-            
+
             <Link to={!user ? "/login" : "/dashboard/chat"} className="group">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -10, scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 className="bg-white p-8 rounded-[24px] shadow-sm border border-gray-100 text-center flex flex-col items-center cursor-pointer hover:shadow-xl hover:shadow-gray-200/50 transition-all duration-300 h-full"

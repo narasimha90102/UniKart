@@ -153,7 +153,7 @@ exports.register = async (req, res, next) => {
       regNo,
       department: department || '',
       college: college || 'University Campus',
-      isVerified: true,
+      isVerified: false,
       status: 'pending_approval'
     });
 
@@ -375,5 +375,162 @@ exports.getProfile = async (req, res, next) => {
     res.json({ success: true, data: user });
   } catch (error) {
     next(error);
+  }
+};
+
+// @desc    Validate Google access token and sign in / register
+// @route   POST /api/auth/google
+// @access  Public
+exports.googleLogin = async (req, res, next) => {
+  try {
+    const { access_token, mode = 'login' } = req.body;
+
+    if (!access_token) {
+      return res.status(400).json({ success: false, message: 'Please provide a Google access token.' });
+    }
+
+    // 1. Fetch user profile from Google's UserInfo API using the access token
+    console.log('[AuthController] Verifying Google access token with Google UserInfo API...');
+    const googleUserRes = await fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${access_token}`);
+    
+    if (!googleUserRes.ok) {
+      console.warn('[AuthController] Google token verification failed. Status:', googleUserRes.status);
+      return res.status(400).json({ success: false, message: 'Invalid or expired Google access token.' });
+    }
+
+    const googleUser = await googleUserRes.json();
+    const { sub: googleId, email, name, picture: avatar } = googleUser;
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Could not retrieve email from Google profile.' });
+    }
+
+    console.log(`[AuthController] Google token verified. Email: ${email}, Name: ${name}, Mode: ${mode}`);
+
+    // Check if user already exists in DB by Google ID or by Email
+    let user = await User.findOne({ 
+      $or: [
+        { googleId },
+        { email: email.toLowerCase() }
+      ]
+    });
+
+    if (mode === 'signup') {
+      // GOOGLE SIGN UP FLOW
+      if (user) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Account already exists. Please go to the login page to sign in.' 
+        });
+      }
+
+      // Create new pending account
+      console.log(`[AuthController] Creating new pending Google account for ${email}...`);
+      const crypto = require('crypto');
+      const randomPassword = crypto.randomBytes(32).toString('hex');
+      const regNo = `G-${Math.floor(10000000 + Math.random() * 90000000)}`;
+
+      user = await User.create({
+        name,
+        email: email.toLowerCase(),
+        password: randomPassword,
+        regNo,
+        googleId,
+        avatar: avatar || 'default-avatar.png',
+        signupMethod: 'google',
+        accountStatus: 'pending',
+        isApproved: false,
+        status: 'pending_approval', // For backward compatibility with verification dashboard queries
+        isVerified: false
+      });
+
+      return res.status(201).json({
+        success: true,
+        message: 'Your account has been created successfully. Your account is currently under review by the UniKart team. You will be able to log in once your account is approved.',
+        status: 'pending_approval'
+      });
+
+    } else {
+      // GOOGLE LOGIN FLOW
+      // CASE 1: NEW USER
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          code: 'ACCOUNT_NOT_FOUND',
+          message: 'Account not found. Please create an account first.'
+        });
+      }
+
+      // If user exists by email but doesn't have googleId linked yet, link it now
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.signupMethod = 'google';
+      }
+
+      // Refresh Google avatar if changed
+      if (avatar && user.avatar !== avatar) {
+        user.avatar = avatar;
+      }
+      await user.save();
+
+      // CASE 2: PENDING APPROVAL
+      if (user.status === 'pending_approval' || user.accountStatus === 'pending') {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_PENDING',
+          message: 'Your account is awaiting admin approval. You will be able to log in after approval.'
+        });
+      }
+
+      // CASE 3: REJECTED
+      if (user.status === 'rejected' || user.accountStatus === 'rejected') {
+        return res.status(403).json({
+          success: false,
+          code: 'ACCOUNT_REJECTED',
+          message: 'Your account request was not approved. Please contact support for assistance.'
+        });
+      }
+
+      // Other constraints (e.g. suspended)
+      if (user.status === 'suspended') {
+        return res.status(403).json({
+          success: false,
+          message: 'Account disabled. Your account has been suspended.'
+        });
+      }
+
+      // CASE 4: APPROVED & SUCCESSFUL LOGIN
+      // Record login history
+      const LoginHistory = require('../models/LoginHistory');
+      await LoginHistory.create({
+        user: user._id,
+        ip: req.ip,
+        device: req.headers['user-agent']
+      });
+
+      console.log('[AuthController] Google login successful. Generating JWT token.');
+
+      return res.status(200).json({
+        success: true,
+        token: generateToken(user._id),
+        user: {
+          _id: user._id,
+          name: user.name,
+          email: user.email,
+          role: user.role,
+          college: user.college,
+          regNo: user.regNo,
+          department: user.department,
+          status: user.status,
+          isVerified: user.isVerified,
+          avatar: user.avatar,
+          wishlist: user.wishlist,
+          createdAt: user.createdAt
+        }
+      });
+    }
+  } catch (error) {
+    console.error('[AuthController] Exception in googleLogin:', error);
+    return res.status(500).json({ success: false, message: 'Server error during Google authentication.' });
   }
 };

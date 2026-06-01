@@ -14,31 +14,31 @@ const panelVariants = {
 };
 
 export function ThemeModal({ onClose }) {
-  const { theme, setTheme, isDark } = useTheme();
+  const { theme, setTheme, isDark, t } = useTheme();
   const [selected, setSelected] = useState(theme);
 
   const options = [
     {
       id: THEMES.LIGHT,
       icon: Sun,
-      label: 'Light Mode',
-      desc: 'Clean white interface, ideal for daytime',
+      label: t('lightMode'),
+      desc: t('lightModeDesc'),
       preview: 'bg-gray-50 border-gray-200',
       dot: 'bg-yellow-400',
     },
     {
       id: THEMES.DARK,
       icon: Moon,
-      label: 'Dark Mode',
-      desc: 'Easy on the eyes, great at night',
+      label: t('darkMode'),
+      desc: t('darkModeDesc'),
       preview: 'bg-gray-900 border-gray-700',
       dot: 'bg-indigo-400',
     },
     {
       id: THEMES.SYSTEM,
       icon: Monitor,
-      label: 'System Default',
-      desc: 'Automatically follows your OS setting',
+      label: t('systemDefault'),
+      desc: t('systemDefaultDesc'),
       preview: 'bg-gradient-to-br from-gray-50 to-gray-800 border-gray-400',
       dot: 'bg-gray-400',
     },
@@ -63,8 +63,8 @@ export function ThemeModal({ onClose }) {
         >
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-xl font-black text-gray-900 tracking-tighter">Theme</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Choose your display mode</p>
+              <h2 className="text-xl font-black text-gray-900 tracking-tighter">{t('theme')}</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{t('chooseDisplayMode')}</p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
               <X className="w-5 h-5 text-gray-400" />
@@ -105,11 +105,11 @@ export function ThemeModal({ onClose }) {
             <button
               onClick={onClose}
               className="flex-1 h-12 rounded-2xl border-2 border-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors"
-            >Cancel</button>
+            >{t('cancel')}</button>
             <button
               onClick={handleApply}
               className="flex-1 h-12 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-xl shadow-primary/20"
-            >Apply</button>
+            >{t('apply')}</button>
           </div>
         </motion.div>
       </div>
@@ -118,11 +118,17 @@ export function ThemeModal({ onClose }) {
 }
 
 export function LanguageModal({ onClose }) {
-  const { language, setLanguage, LANGUAGES } = useTheme();
+  const { language, setLanguage, LANGUAGES, t } = useTheme();
   const [selected, setSelected] = useState(language);
+  const [loading, setLoading] = useState(false);
 
-  const handleApply = () => {
-    setLanguage(selected);
+  const handleSelect = async (code) => {
+    setSelected(code);
+    setLoading(true);
+    // Smooth transition delay to feel premium
+    await new Promise(resolve => setTimeout(resolve, 600));
+    await setLanguage(code);
+    setLoading(false);
     onClose();
   };
 
@@ -136,12 +142,19 @@ export function LanguageModal({ onClose }) {
         />
         <motion.div
           variants={panelVariants} initial="hidden" animate="visible" exit="exit"
-          className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10"
+          className="bg-white w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl relative z-10 overflow-hidden"
         >
+          {loading && (
+            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-[11] flex flex-col items-center justify-center gap-3">
+              <div className="w-10 h-10 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+              <p className="text-xs font-black text-gray-500 uppercase tracking-widest animate-pulse">Applying Language...</p>
+            </div>
+          )}
+
           <div className="flex items-center justify-between mb-8">
             <div>
-              <h2 className="text-xl font-black text-gray-900 tracking-tighter">Language</h2>
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Select your preferred language</p>
+              <h2 className="text-xl font-black text-gray-900 tracking-tighter">{t('language')}</h2>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{t('selectPreferredLanguage')}</p>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
               <X className="w-5 h-5 text-gray-400" />
@@ -154,7 +167,7 @@ export function LanguageModal({ onClose }) {
               return (
                 <button
                   key={lang.code}
-                  onClick={() => setSelected(lang.code)}
+                  onClick={() => handleSelect(lang.code)}
                   className={`w-full flex items-center gap-4 px-5 py-4 rounded-2xl border-2 transition-all text-left ${
                     isActive ? 'border-primary bg-primary/5' : 'border-gray-100 hover:border-gray-200 hover:bg-gray-50'
                   }`}
@@ -177,12 +190,8 @@ export function LanguageModal({ onClose }) {
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 h-12 rounded-2xl border-2 border-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors"
-            >Cancel</button>
-            <button
-              onClick={handleApply}
-              className="flex-1 h-12 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-widest hover:bg-primary/90 transition-all shadow-xl shadow-primary/20"
-            >Apply</button>
+              className="w-full h-12 rounded-2xl border-2 border-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-colors"
+            >{t('cancel')}</button>
           </div>
         </motion.div>
       </div>

@@ -6,7 +6,7 @@ const Category = require('../models/Category');
 // @access  Public
 exports.getCategories = async (req, res, next) => {
   try {
-    const categories = await Category.find().sort('name');
+    const categories = await Category.find().sort('name').lean();
     res.json({ success: true, count: categories.length, data: categories.map(c => c.name) });
   } catch (error) {
     next(error);
@@ -53,17 +53,22 @@ exports.getProducts = async (req, res, next) => {
       ? (req.query.status === 'all' ? { $exists: true } : req.query.status) 
       : { $in: ['active', 'available'] };
     
+    const findParams = { ...reqQuery, status: statusFilter };
+
+    // Filter out sold products older than 5 days
+    if (req.query.status === 'sold') {
+      const fiveDaysAgo = new Date();
+      fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+      findParams.updatedAt = { $gte: fiveDaysAgo };
+    }
+    
     if (req.query.search) {
       query = Product.find({ 
         $text: { $search: req.query.search }, 
-        ...reqQuery, 
-        status: statusFilter 
+        ...findParams 
       });
     } else {
-      query = Product.find({ 
-        ...reqQuery, 
-        status: statusFilter 
-      });
+      query = Product.find(findParams);
     }
 
     // Sort
@@ -79,7 +84,7 @@ exports.getProducts = async (req, res, next) => {
     const limit = parseInt(req.query.limit, 10) || 12;
     const startIndex = (page - 1) * limit;
     
-    query = query.skip(startIndex).limit(limit).populate('seller', 'name college ratings');
+    query = query.skip(startIndex).limit(limit).populate('seller', 'name college ratings').lean();
 
     const products = await query;
 
@@ -98,7 +103,7 @@ exports.getProducts = async (req, res, next) => {
 // @access  Public
 exports.getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id).populate('seller', 'name college ratings');
+    const product = await Product.findById(req.params.id).populate('seller', 'name college ratings').lean();
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -113,6 +118,14 @@ exports.getProduct = async (req, res, next) => {
 // @access  Private
 exports.createProduct = async (req, res, next) => {
   try {
+    // Security Restriction: Only verified users can list products for sale
+    if (!req.user.isVerified && req.user.role !== 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Only verified campus accounts can list products for sale. Please complete your profile verification.'
+      });
+    }
+
     req.body.seller = req.user.id;
     // Set default location from user's college if not provided
     if (!req.body.location) {

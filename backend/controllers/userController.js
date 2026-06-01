@@ -42,10 +42,31 @@ exports.rateUser = async (req, res, next) => {
 // @access  Public
 exports.getUser = async (req, res, next) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
+    let user;
+    if (req.params.id.match(/^[0-9a-fA-F]{24}$/)) {
+      user = await User.findById(req.params.id).select('-password').lean();
+    } else {
+      const decodedName = decodeURIComponent(req.params.id);
+      user = await User.findOne({ name: { $regex: new RegExp('^' + decodedName + '$', 'i') } }).select('-password').lean();
+    }
+
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+
+    const Review = require('../models/Review');
+    const Product = require('../models/Product');
+    const Order = require('../models/Order');
+
+    const userId = user._id;
+
+    user.stats = {
+      rating: user.ratings?.average || 0.0,
+      totalReviews: await Review.countDocuments({ seller: userId }),
+      productsSold: await Product.countDocuments({ seller: userId, status: 'sold' }),
+      completedOrders: await Order.countDocuments({ seller: userId, status: 'completed' })
+    };
+
     res.json({ success: true, data: user });
   } catch (error) {
     next(error);
@@ -131,7 +152,10 @@ exports.getCart = async (req, res, next) => {
 // @access  Private
 exports.updateProfile = async (req, res, next) => {
   try {
-    const { name, phoneNumber, college, bio, avatar } = req.body;
+    const { 
+      name, phoneNumber, college, bio, avatar, addresses, paymentMethods, twoFA, blockedUsers, language,
+      dob, gender, address, state, city, pincode
+    } = req.body;
     const user = await User.findById(req.user.id);
 
     if (name) user.name = name;
@@ -139,6 +163,19 @@ exports.updateProfile = async (req, res, next) => {
     if (college) user.college = college;
     if (bio !== undefined) user.bio = bio;
     if (avatar) user.avatar = avatar;
+
+    if (addresses !== undefined) user.addresses = addresses;
+    if (paymentMethods !== undefined) user.paymentMethods = paymentMethods;
+    if (twoFA !== undefined) user.twoFA = twoFA;
+    if (blockedUsers !== undefined) user.blockedUsers = blockedUsers;
+    if (language !== undefined) user.language = language;
+
+    if (dob !== undefined) user.dob = dob;
+    if (gender !== undefined) user.gender = gender;
+    if (address !== undefined) user.address = address;
+    if (state !== undefined) user.state = state;
+    if (city !== undefined) user.city = city;
+    if (pincode !== undefined) user.pincode = pincode;
 
     await user.save();
     res.json({ success: true, data: user });

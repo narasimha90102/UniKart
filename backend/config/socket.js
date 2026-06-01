@@ -9,6 +9,8 @@ const onlineUsers = new Map();
 const activeRooms = new Map();
 
 module.exports = (io) => {
+  global.io = io;
+  
   io.on('connection', (socket) => {
     console.log(`[Socket] New connection: ${socket.id}`);
 
@@ -65,12 +67,20 @@ module.exports = (io) => {
       const { senderId, receiverId, senderName, content, imageUrl, room } = data;
       
       try {
-        const newMessage = await Message.create({
+        let newMessage = await Message.create({
           sender: senderId,
           receiver: receiverId,
           content: content || '',
-          imageUrl: imageUrl || null
+          imageUrl: imageUrl || null,
+          isOrderRequest: data.isOrderRequest || false,
+          orderProduct: data.orderProduct || null,
+          orderPrice: data.orderPrice || null,
+          orderStatus: data.orderStatus || 'pending'
         });
+
+        if (newMessage.isOrderRequest && newMessage.orderProduct) {
+          newMessage = await Message.findById(newMessage._id).populate('orderProduct', 'title images price status');
+        }
 
         const payload = {
           _id: newMessage._id,
@@ -81,7 +91,11 @@ module.exports = (io) => {
           imageUrl: newMessage.imageUrl,
           room,
           read: false,
-          createdAt: newMessage.createdAt
+          createdAt: newMessage.createdAt,
+          isOrderRequest: newMessage.isOrderRequest || false,
+          orderProduct: newMessage.orderProduct || null,
+          orderPrice: newMessage.orderPrice || null,
+          orderStatus: newMessage.orderStatus || 'pending'
         };
 
         io.to(room).emit('receive_message', payload);
@@ -125,6 +139,14 @@ module.exports = (io) => {
         }
       } catch (err) {
         console.error('[Socket] Send message error:', err);
+      }
+    });
+
+    socket.on('update_order_status', async ({ messageId, status, room }) => {
+      try {
+        io.to(room).emit('order_status_updated', { messageId, status });
+      } catch (err) {
+        console.error('[Socket] Update order status error:', err);
       }
     });
 

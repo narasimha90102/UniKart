@@ -9,17 +9,41 @@ export default defineConfig({
     react()
   ],
   server: {
+    host: true,
+    warmup: {
+      clientFiles: [
+        './src/main.jsx',
+        './src/App.jsx',
+        './src/pages/auth/Login.jsx',
+        './src/pages/auth/Signup.jsx',
+        './src/pages/main/Home.jsx',
+        './src/pages/main/Marketplace.jsx',
+        './src/components/layout/Navbar.jsx',
+        './src/components/layout/AppLayout.jsx',
+      ]
+    },
     proxy: {
       '/socket.io': {
         target: 'http://localhost:5000',
         changeOrigin: true,
-        ws: true, // enable WebSocket proxying
+        ws: true,
       },
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
       }
     }
+  },
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react-router-dom',
+      'framer-motion',
+      'lucide-react',
+      'axios',
+      'socket.io-client',
+    ]
   },
   build: {
     chunkSizeWarningLimit: 1000,
@@ -43,3 +67,4 @@ export default defineConfig({
     }
   }
 })
+

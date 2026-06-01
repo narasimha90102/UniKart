@@ -5,7 +5,7 @@ import {
   Settings, LogOut, MessageCircle, List, User, 
   MapPin, ShieldCheck, HelpCircle, FileText, 
   ChevronRight, ShoppingBag, PlusCircle, History,
-  Bell, Trash2
+  Bell, Trash2, ShieldAlert, X
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
@@ -21,6 +21,8 @@ export function Profile() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [stats, setStats] = useState({ orders: 0, wishlist: 0, listings: 0 });
+  const [myReviews, setMyReviews] = useState([]);
+  const [showFullAvatar, setShowFullAvatar] = useState(false);
   const isAdmin = user?.role === 'admin';
   
   const [formData, setFormData] = useState({
@@ -29,7 +31,13 @@ export function Profile() {
     phone: user?.phoneNumber || '',
     department: user?.college || '',
     bio: user?.bio || '',
-    avatar: user?.avatar || ''
+    avatar: user?.avatar || '',
+    dob: user?.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
+    gender: user?.gender || '',
+    address: user?.address || '',
+    state: user?.state || '',
+    city: user?.city || '',
+    pincode: user?.pincode || ''
   });
 
   // Sync state if user context updates
@@ -41,7 +49,13 @@ export function Profile() {
         phone: user.phoneNumber || '',
         department: user.college || '',
         bio: user.bio || '',
-        avatar: user.avatar || ''
+        avatar: user.avatar || '',
+        dob: user.dob ? new Date(user.dob).toISOString().split('T')[0] : '',
+        gender: user.gender || '',
+        address: user.address || '',
+        state: user.state || '',
+        city: user.city || '',
+        pincode: user.pincode || ''
       });
     }
   }, [user]);
@@ -65,15 +79,17 @@ export function Profile() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const [ordersRes, listingsRes] = await Promise.all([
+        const [ordersRes, listingsRes, reviewsRes] = await Promise.all([
           api.get('/orders/my-orders'),
-          api.get(`/products?seller=${user._id}&status=active`)
+          api.get(`/products?seller=${user._id}&status=active`),
+          api.get(`/reviews/seller/${user._id}`)
         ]);
         setStats({
           orders: ordersRes.data.data.length,
           wishlist: user?.wishlist?.length || 0,
           listings: listingsRes.data.data.length
         });
+        setMyReviews(reviewsRes.data.data || []);
       } catch (err) {
         console.error('Failed to fetch stats', err);
       }
@@ -97,9 +113,29 @@ export function Profile() {
     return phoneRegex.test(clean);
   };
 
+  const getProfileCompletion = () => {
+    const fields = [
+      { label: 'Full Name', check: () => !!user?.name && user.name.trim() !== '' },
+      { label: 'Email Address', check: () => !!user?.email && user.email.trim() !== '' },
+      { label: 'Mobile Number', check: () => !!user?.phoneNumber && user.phoneNumber.trim() !== '' },
+      { label: 'Date of Birth', check: () => !!user?.dob },
+      { label: 'Gender', check: () => !!user?.gender && user.gender.trim() !== '' },
+      { label: 'Profile Picture', check: () => !!user?.avatar && user.avatar !== 'default-avatar.png' && user.avatar.trim() !== '' },
+      { label: 'Complete Address', check: () => !!user?.address && user.address.trim() !== '' }
+    ];
+
+    const completed = fields.filter(f => f.check());
+    const missing = fields.filter(f => !f.check());
+    const percentage = Math.round((completed.length / fields.length) * 100);
+
+    return { percentage, missing: missing.map(m => m.label) };
+  };
+
+  const { percentage: completionPercentage, missing: missingFields } = getProfileCompletion();
+
   const isFormValid = 
     formData.name.trim() !== '' &&
-    isPhoneValid(formData.phone) &&
+    (formData.phone === '' || isPhoneValid(formData.phone)) &&
     (isAdmin || (formData.department && formData.department.trim() !== ''));
 
   const handleSave = async (e) => {
@@ -113,7 +149,10 @@ export function Profile() {
         phoneNumber: formData.phone,
         college: isAdmin ? undefined : formData.department,
         bio: formData.bio,
-        avatar: formData.avatar
+        avatar: formData.avatar,
+        dob: formData.dob || undefined,
+        gender: formData.gender,
+        address: formData.address
       });
       const updatedUser = { ...user, ...res.data.data };
       setUser(updatedUser);
@@ -128,41 +167,6 @@ export function Profile() {
     }
   };
 
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
-  };
-
-  const AccountSection = ({ title, items }) => (
-    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-xl shadow-gray-200/40 overflow-hidden mb-6">
-      {title && (
-        <div className="px-6 py-4 bg-gray-50/50 border-b border-gray-50">
-          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{title}</h3>
-        </div>
-      )}
-      <div className="divide-y divide-gray-50">
-        {items.map((item, idx) => (
-          <button
-            key={idx}
-            onClick={() => item.onClick ? item.onClick() : navigate(item.path)}
-            className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors group text-left"
-          >
-            <div className="flex items-center gap-4">
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${item.danger ? 'bg-red-50 text-red-500' : 'bg-gray-50 text-gray-500 group-hover:bg-primary/10 group-hover:text-primary'}`}>
-                <item.icon className="w-5 h-5" />
-              </div>
-              <div>
-                <p className={`text-sm font-black ${item.danger ? 'text-red-600' : 'text-gray-900'}`}>{item.label}</p>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{item.desc}</p>
-              </div>
-            </div>
-            <ChevronRight className={`w-4 h-4 ${item.danger ? 'text-red-200' : 'text-gray-300'}`} />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-
   if (view === 'edit') {
     return (
       <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="max-w-2xl mx-auto pb-24 lg:pb-0">
@@ -172,6 +176,48 @@ export function Profile() {
           </button>
           <h1 className="text-2xl font-black text-gray-900 tracking-tighter">Edit Profile</h1>
         </div>
+
+        {/* Visual completion tracker widgets */}
+        {!isAdmin && (
+          <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-xl shadow-gray-200/20 mb-6 space-y-4">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-xs font-black text-gray-900 tracking-tight uppercase tracking-widest">Verification Checklist</span>
+              <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-lg ${
+                completionPercentage === 100 ? 'bg-emerald-100 text-emerald-700' : 'bg-orange-100 text-orange-700'
+              }`}>
+                {completionPercentage}% Complete
+              </span>
+            </div>
+            
+            <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className={`h-full transition-all duration-500 rounded-full ${
+                  completionPercentage === 100 ? 'bg-emerald-500' : 'bg-orange-500'
+                }`}
+                style={{ width: `${completionPercentage}%` }}
+              />
+            </div>
+
+            {missingFields.length > 0 ? (
+              <div>
+                <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2">Remaining Fields</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {missingFields.map((field, idx) => (
+                    <div key={idx} className="flex items-center gap-1.5 text-[10px] font-bold text-orange-600 bg-orange-50/50 p-2 rounded-lg border border-orange-100/50">
+                      <ShieldAlert className="w-3 h-3 text-orange-500 shrink-0" />
+                      <span>{field}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 text-emerald-800 bg-emerald-50 p-3 rounded-xl border border-emerald-100 text-xs font-bold">
+                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                <span>Profile completed! Your account has been verified.</span>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="bg-white rounded-[2.5rem] p-8 border border-gray-100 shadow-2xl shadow-gray-200/40">
           <form onSubmit={handleSave} className="space-y-6">
@@ -207,25 +253,61 @@ export function Profile() {
                 className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white"
               />
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number *</label>
-              <Input
-                value={formData.phone}
-                onChange={e => setFormData({...formData, phone: e.target.value})}
-                placeholder="+91 xxxxxxxxxx"
-                className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white"
-              />
-            </div>
-            {!isAdmin && (
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">College/Department *</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Phone Number *</label>
                 <Input
-                  value={formData.department}
-                  onChange={e => setFormData({...formData, department: e.target.value})}
+                  value={formData.phone}
+                  onChange={e => setFormData({...formData, phone: e.target.value})}
+                  placeholder="+91 xxxxxxxxxx"
                   className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white"
                 />
+                {formData.phone && !isPhoneValid(formData.phone) && (
+                  <p className="text-[10px] font-bold text-orange-500 mt-1 pl-1">
+                    ⚠ Invalid format. Rules: Must be a 10-digit number starting with 6-9 (e.g., +91 9876543210).
+                  </p>
+                )}
               </div>
-            )}
+              
+              {!isAdmin && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">College/Department *</label>
+                  <Input
+                    value={formData.department}
+                    onChange={e => setFormData({...formData, department: e.target.value})}
+                    className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Date of Birth *</label>
+                <input
+                  type="date"
+                  value={formData.dob}
+                  onChange={e => setFormData({...formData, dob: e.target.value})}
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Gender *</label>
+                <select
+                  value={formData.gender}
+                  onChange={e => setFormData({...formData, gender: e.target.value})}
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-semibold text-gray-900 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all"
+                >
+                  <option value="">Select Gender</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                  <option value="prefer_not_to_say">Prefer Not To Say</option>
+                </select>
+              </div>
+            </div>
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Short Bio</label>
@@ -237,12 +319,28 @@ export function Profile() {
                 className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-semibold text-gray-900 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all resize-none"
               />
             </div>
+
+            <div className="border-t border-gray-50 pt-6 space-y-4">
+              <h4 className="text-xs font-black uppercase tracking-wider text-gray-800 ml-1">Campus / Billing Address</h4>
+              
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Complete Address *</label>
+                <Input
+                  value={formData.address}
+                  onChange={e => setFormData({...formData, address: e.target.value})}
+                  placeholder="Flat/Hostel name, Block/Room No., Street Address"
+                  className="h-14 rounded-2xl bg-gray-50 border-transparent focus:bg-white"
+                />
+              </div>
+
+
+            </div>
             
             {saveError && <p className="text-xs font-bold text-red-500 bg-red-50 p-4 rounded-xl border border-red-100">{saveError}</p>}
             
             <div className="flex gap-4 pt-4">
               <Button type="button" variant="outline" className="flex-1 h-14 rounded-2xl font-bold" onClick={() => setView('overview')}>Cancel</Button>
-              <Button type="submit" disabled={!isFormValid || isSaving} className="flex-1 h-14 rounded-2xl font-black shadow-xl shadow-primary/20">
+              <Button type="submit" disabled={!isFormValid || isSaving} className="flex-1 h-14 rounded-2xl font-black bg-primary text-white shadow-xl shadow-primary/20 hover:bg-primary/95">
                 {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
@@ -265,7 +363,8 @@ export function Profile() {
               <img 
                 src={user.avatar} 
                 alt="User" 
-                className="w-32 h-32 rounded-full object-cover ring-4 ring-white/20" 
+                onClick={() => setShowFullAvatar(true)}
+                className="w-32 h-32 rounded-full object-cover ring-4 ring-white/20 cursor-zoom-in hover:scale-105 active:scale-95 transition-all shadow-md" 
               />
             ) : (
               <div className="default-avatar w-32 h-32 rounded-full bg-white text-[#1B8C50] font-black flex items-center justify-center text-5xl uppercase ring-4 ring-white/20 select-none shadow-inner">
@@ -290,7 +389,7 @@ export function Profile() {
               )}
             </div>
           </div>
-          <Button variant="outline" className="border-white/30 text-white hover:bg-white hover:text-primary transition-all rounded-2xl px-8 h-12 font-bold mt-2" onClick={() => setView('edit')}>
+          <Button variant="outline" className="border-white/30 text-white hover:bg-white hover:text-[#1B8C50] transition-all rounded-2xl px-8 h-12 font-bold mt-2" onClick={() => setView('edit')}>
             Edit Profile
           </Button>
         </div>
@@ -323,11 +422,28 @@ export function Profile() {
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">College / Campus</p>
               <p className="text-base font-black text-gray-900">{user?.college || 'Not set'}</p>
             </div>
+            <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Date of Birth</p>
+              <p className="text-base font-black text-gray-900">
+                {user?.dob ? new Date(user.dob).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not provided'}
+              </p>
+            </div>
+            <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Gender</p>
+              <p className="text-base font-black text-gray-900 capitalize">{user?.gender || 'Not provided'}</p>
+            </div>
           </div>
           {user?.bio && (
             <div className="mt-6 p-5 bg-gray-50 rounded-3xl border border-gray-100">
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Short Bio</p>
               <p className="text-sm font-semibold text-gray-700 leading-relaxed">{user.bio}</p>
+            </div>
+          )}
+
+          {user?.address && (
+            <div className="mt-6 p-5 bg-gray-50 rounded-3xl border border-gray-100">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Verified Address</p>
+              <p className="text-sm font-bold text-gray-800 leading-relaxed">{user.address}</p>
             </div>
           )}
         </div>
@@ -336,9 +452,13 @@ export function Profile() {
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Marketplace Status</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
-              <p className="text-2xl font-black text-primary leading-none">{user?.ratings?.average || '0.0'}</p>
+              <p className="text-2xl font-black text-primary leading-none">
+                {myReviews.length > 0
+                  ? (myReviews.reduce((acc, curr) => acc + curr.rating, 0) / myReviews.length).toFixed(1)
+                  : Number(user?.ratings?.average || 0).toFixed(1)}
+              </p>
               <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Seller Rating</p>
-              <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5 tracking-tighter">({user?.ratings?.count || 0} reviews)</p>
+              <p className="text-[9px] font-bold text-gray-400 uppercase mt-0.5 tracking-tighter">({myReviews.length} reviews)</p>
             </div>
             <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
               <p className="text-2xl font-black text-gray-900 leading-none">
@@ -347,12 +467,24 @@ export function Profile() {
               <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Joined Date</p>
             </div>
             {!isAdmin ? (
-              <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
-                <p className={`text-sm font-black leading-none uppercase tracking-widest mt-1 ${user?.isVerified ? 'text-emerald-500' : 'text-orange-500'}`}>
-                  {user?.isVerified ? 'Verified' : 'Pending'}
-                </p>
-                <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Verification Status</p>
-              </div>
+              user?.isVerified ? (
+                <div className="p-5 bg-emerald-50 border border-emerald-100 rounded-3xl text-center">
+                  <p className="text-sm font-black leading-none uppercase tracking-widest mt-1 text-emerald-600 flex items-center justify-center gap-1">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" /> Verified
+                  </p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest">Verification Status</p>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setView('edit')}
+                  className="p-5 bg-orange-50 border border-orange-100 rounded-3xl text-center hover:bg-orange-100/50 transition-colors w-full group active:scale-[0.98]"
+                >
+                  <p className="text-sm font-black leading-none uppercase tracking-widest mt-1 text-orange-600 flex items-center justify-center gap-1">
+                    <ShieldAlert className="w-4 h-4 text-orange-500 shrink-0 animate-pulse" /> Verify Account
+                  </p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase mt-2 tracking-widest group-hover:text-primary transition-colors">Click to complete</p>
+                </button>
+              )
             ) : (
               <div className="p-5 bg-gray-50 rounded-3xl border border-gray-100 text-center">
                 <p className="text-sm font-black leading-none uppercase tracking-widest mt-1 text-primary">
@@ -364,6 +496,55 @@ export function Profile() {
           </div>
         </div>
 
+        {/* Recent Completed Reviews */}
+        <div className="pt-8 border-t border-gray-50">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-6">Recent Completed Reviews</h3>
+          {myReviews.length > 0 ? (
+            <div className="space-y-4">
+              {myReviews.slice(0, 3).map((review) => (
+                <div key={review._id} className="p-5 bg-gray-50 rounded-3xl border border-gray-100 flex flex-col sm:flex-row gap-4 justify-between">
+                  <div className="flex gap-3 items-start">
+                    <div className="w-10 h-10 rounded-full bg-emerald-50 text-[#1B8C50] flex items-center justify-center font-black text-xs shrink-0 select-none uppercase">
+                      {review.buyer?.name ? review.buyer.name.split(' ').map(n => n[0]).join('').slice(0, 2) : 'U'}
+                    </div>
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-extrabold text-gray-900 text-xs">{review.buyer?.name || 'Anonymous Buyer'}</span>
+                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full uppercase tracking-wider">Verified Buyer</span>
+                      </div>
+                      
+                      {/* Rating stars */}
+                      <div className="flex items-center gap-0.5">
+                        {Array.from({ length: 5 }).map((_, idx) => (
+                          <span key={idx} className={`text-xs ${idx < review.rating ? 'text-amber-400' : 'text-gray-200'}`}>★</span>
+                        ))}
+                      </div>
+
+                      <p className="text-xs font-semibold text-gray-600 italic mt-1 leading-relaxed">
+                        "{review.reviewText}"
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="sm:text-right flex flex-col justify-between items-start sm:items-end border-t sm:border-t-0 border-gray-100 pt-3 sm:pt-0 shrink-0">
+                    <div>
+                      <span className="text-[9px] font-bold text-gray-400 block uppercase tracking-widest">Item</span>
+                      <span className="text-[11px] font-black text-gray-700 block max-w-[180px] truncate">{review.product?.title || 'Campus Item'}</span>
+                    </div>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase mt-2 sm:mt-0">
+                      {new Date(review.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-8 text-center bg-gray-50 rounded-3xl border border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">No completed reviews yet</p>
+            </div>
+          )}
+        </div>
+
         <div className="pt-8 border-t border-gray-50">
           <Link to="/dashboard/settings">
             <Button variant="outline" className="w-full h-14 rounded-2xl border-gray-100 text-gray-600 font-bold hover:bg-gray-50">
@@ -373,9 +554,40 @@ export function Profile() {
         </div>
       </div>
 
-      <div className="text-center py-8">
-        <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.4em]">UniKart v2.1.0 • Campus Certified</p>
-      </div>
+      {/* Lightbox / Full-screen Avatar Preview Modal */}
+      <AnimatePresence>
+        {showFullAvatar && user?.avatar && user.avatar !== 'default-avatar.png' && (
+          <motion.div 
+            initial={{ opacity: 0 }} 
+            animate={{ opacity: 1 }} 
+            exit={{ opacity: 0 }}
+            onClick={() => setShowFullAvatar(false)}
+            className="fixed inset-0 bg-black/85 backdrop-blur-md z-[999] flex items-center justify-center p-4 cursor-zoom-out"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="relative max-w-lg w-full aspect-square bg-transparent rounded-3xl overflow-hidden shadow-2xl border-4 border-white/20"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img 
+                src={user.avatar} 
+                alt="User Profile" 
+                className="w-full h-full object-cover" 
+              />
+              <button 
+                onClick={() => setShowFullAvatar(false)}
+                className="absolute top-4 right-4 bg-black/60 text-white rounded-full p-2.5 hover:bg-black/80 transition-all border border-white/10"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
     </motion.div>
   );
 }

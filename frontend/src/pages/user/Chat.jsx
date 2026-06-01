@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation, Link } from 'react-router-dom';
-import { Send, Image as ImageIcon, MoreVertical, Search, UserPlus, Circle, CheckCheck, X, MessageSquare, ShieldCheck, Wifi, WifiOff, Trash2, User, Clock, ArrowLeft, Paperclip, Image, Calendar } from 'lucide-react';
+import { Send, Image as ImageIcon, MoreVertical, Search, UserPlus, Circle, CheckCheck, X, MessageSquare, ShieldCheck, Wifi, WifiOff, Trash2, User, Clock, ArrowLeft, Paperclip, Image, Calendar, Banknote, Star } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { ChatWallpaper } from '../../components/shared/ChatWallpaper';
@@ -42,6 +42,23 @@ export function Chat() {
   const messagesContainerRef = useRef(null);
   const fileInputRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  const menuRef = useRef(null);
+
+  // Click outside to close three-dot menu
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuRef.current && !menuRef.current.contains(event.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    if (isMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isMenuOpen]);
 
   // Connection Monitoring
   useEffect(() => {
@@ -157,7 +174,7 @@ export function Chat() {
       }
     };
     if (user) fetchContacts();
-  }, [user?._id || user?.id, location.state]);
+  }, [user?._id || user?.id]);
 
   const currentRoom = activeChat && user ? [String(user._id || user.id), String(activeChat.id)].sort().join('-') : null;
 
@@ -176,7 +193,15 @@ export function Chat() {
       setLoadingHistory(true);
       try {
         const res = await api.get(`/chat/history/${currentRoom}`);
-        const history = res.data.data || [];
+        const rawHistory = res.data.data || [];
+        const uniqueMsgMap = new Map();
+        rawHistory.forEach(m => {
+          if (m && m._id) {
+            const key = m.isReviewRequest && m.reviewOrderId ? `review-${m.reviewOrderId}` : m._id.toString();
+            uniqueMsgMap.set(key, m);
+          }
+        });
+        const history = Array.from(uniqueMsgMap.values());
         setMessages(history);
         
         // Mark any unread messages as seen in UI
@@ -252,10 +277,17 @@ export function Chat() {
       }
     };
 
+    const handleOrderStatusUpdated = ({ messageId, status }) => {
+      setMessages(prev => prev.map(m => 
+        String(m._id) === String(messageId) ? { ...m, orderStatus: status } : m
+      ));
+    };
+
     socket.on('receive_message', handleReceiveMessage);
     socket.on('messages_seen', handleMessagesSeen);
     socket.on('typing', handleTyping);
     socket.on('stop_typing', handleStopTyping);
+    socket.on('order_status_updated', handleOrderStatusUpdated);
 
     return () => {
       socket.emit('leave_chat', currentRoom);
@@ -263,6 +295,7 @@ export function Chat() {
       socket.off('messages_seen', handleMessagesSeen);
       socket.off('typing', handleTyping);
       socket.off('stop_typing', handleStopTyping);
+      socket.off('order_status_updated', handleOrderStatusUpdated);
       setOtherUserTyping(false);
     };
   }, [socket, currentRoom, activeChat?.id, markChatRead, user?._id || user?.id]);
@@ -277,6 +310,42 @@ export function Chat() {
       }
     }, 50);
   };
+
+  const handleUpdateOrderStatus = async (messageId, status) => {
+    try {
+      await api.put(`/chat/order-request/${messageId}`, { action: status });
+      
+      setMessages(prev => prev.map(m => 
+        String(m._id) === String(messageId) ? { ...m, orderStatus: status } : m
+      ));
+
+      socket?.emit('update_order_status', { messageId, status, room: currentRoom });
+    } catch (err) {
+      console.error('Failed to update order status:', err);
+      alert('Failed to update order status. Please try again.');
+    }
+  };
+
+  // Auto-send meetup collection request when redirected from Checkout
+  useEffect(() => {
+    if (activeChat && location.state?.sendOrderRequest && socket && currentRoom) {
+      const { productId, productPrice, productTitle } = location.state;
+      
+      if (!window.sentRequests) window.sentRequests = new Set();
+      if (window.sentRequests.has(productId)) return;
+      window.sentRequests.add(productId);
+
+      sendMessage(`I would like to buy "${productTitle}" via Cash on Meetup/Delivery.`, null, {
+        isOrderRequest: true,
+        orderProduct: productId,
+        orderPrice: productPrice,
+        orderStatus: 'pending'
+      });
+
+      // Consume/clear react-router location state
+      window.history.replaceState({}, document.title);
+    }
+  }, [activeChat, location.state, socket, currentRoom]);
 
   const handleTypingIndicator = (e) => {
     setMessageInput(e.target.value);
@@ -294,8 +363,8 @@ export function Chat() {
     }, 2000);
   };
 
-  const sendMessage = (content = '', imageUrl = null) => {
-    if ((!content.trim() && !imageUrl) || !socket || !activeChat) return;
+  const sendMessage = (content = '', imageUrl = null, extraFields = {}) => {
+    if ((!content.trim() && !imageUrl && !extraFields.isOrderRequest) || !socket || !activeChat) return;
 
     const messageData = {
       _id: `temp-${Date.now()}`,
@@ -306,7 +375,8 @@ export function Chat() {
       imageUrl,
       room: currentRoom,
       createdAt: new Date().toISOString(),
-      read: false
+      read: false,
+      ...extraFields
     };
 
     // Optimistic UI
@@ -323,22 +393,18 @@ export function Chat() {
       const filtered = prev.filter(c => String(c.id) !== String(activeChat.id));
       return [{
         ...activeChat,
-        lastMessage: content || 'Image attached',
+        lastMessage: extraFields.isOrderRequest ? 'Meetup Cash Collection Request' : (content || 'Image attached'),
         time: new Date().toISOString()
       }, ...filtered];
     });
   };
 
   const handleDeleteMessage = async (messageId) => {
-    if (!window.confirm('Delete this message for everyone?')) return;
+    if (!window.confirm('Delete this message? It will only be removed for you.')) return;
     try {
       await api.delete(`/chat/message/${messageId}`);
-      socket.emit('delete_message', { messageId, room: currentRoom });
-      setMessages(prev => prev.map(m => 
-        String(m._id) === String(messageId) 
-          ? { ...m, isDeleted: true, content: 'This message was deleted', imageUrl: null } 
-          : m
-      ));
+      // Remove only from local state — receiver still sees it
+      setMessages(prev => prev.filter(m => String(m._id) !== String(messageId)));
     } catch (err) {
       console.error('Failed to delete message');
     }
@@ -459,7 +525,14 @@ export function Chat() {
                     className={`flex items-center gap-3 p-3.5 rounded-2xl cursor-pointer transition-all ${activeChat?.id === c.id ? 'bg-primary text-white shadow-xl shadow-primary/20 scale-[1.02]' : 'hover:bg-gray-50'}`}
                   >
                     <div className="relative shrink-0">
-                      <img src={getAvatarUrl(c.avatar, c.sender)} className="w-12 h-12 rounded-2xl object-cover shadow-sm" />
+                      <img 
+                        src={getAvatarUrl(c.avatar, c.sender)} 
+                        className="w-12 h-12 rounded-2xl object-cover shadow-sm" 
+                        onError={(e) => {
+                          e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.sender)}&background=1B8C50&color=fff`;
+                        }}
+                        alt={c.sender}
+                      />
                       {isOnline && <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />}
                     </div>
                     <div className="flex-1 min-w-0">
@@ -489,13 +562,20 @@ export function Chat() {
       <main className={`${!activeChat ? 'hidden md:flex' : 'flex'} flex-1 flex-col bg-white relative overflow-hidden`}>
         {activeChat ? (
           <>
-            <header className="p-4 md:p-6 border-b border-gray-50 flex items-center justify-between bg-white/30 backdrop-blur-md sticky top-0 z-10">
+            <header className="p-4 md:p-6 border-b border-gray-50 flex items-center justify-between bg-white/30 backdrop-blur-md sticky top-0 z-50">
               <div className="flex items-center gap-3 md:gap-4">
                 <button onClick={() => setActiveChat(null)} className="md:hidden p-2 -ml-2 text-gray-400 hover:text-primary transition-colors"><ArrowLeft className="w-5 h-5" /></button>
-                <div className="relative">
-                  <img src={getAvatarUrl(activeChat.avatar, activeChat.sender)} className="w-10 h-10 md:w-12 md:h-12 rounded-2xl object-cover shadow-sm" />
+                <Link to={`/user/${encodeURIComponent(activeChat.sender)}`} className="relative shrink-0 block cursor-pointer group">
+                  <img 
+                    src={getAvatarUrl(activeChat.avatar, activeChat.sender)} 
+                    className="w-10 h-10 md:w-12 md:h-12 rounded-2xl object-cover shadow-sm group-hover:scale-105 transition-transform" 
+                    onError={(e) => {
+                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(activeChat.sender)}&background=1B8C50&color=fff`;
+                    }}
+                    alt={activeChat.sender}
+                  />
                   {onlineUsers.has(String(activeChat.id)) && <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-white" />}
-                </div>
+                </Link>
                 <div>
                   <Link to={`/user/${encodeURIComponent(activeChat.sender)}`} className="text-sm md:text-base font-black text-gray-900 hover:text-primary transition-colors block leading-none">{activeChat.sender}</Link>
                   <div className="flex items-center gap-1.5 mt-1">
@@ -514,17 +594,14 @@ export function Chat() {
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tight">End-to-End</span>
                 </div>
-                <div className="relative">
+                <div ref={menuRef} className="relative">
                   <Button variant="ghost" size="icon" className="rounded-xl h-10 w-10 hover:bg-gray-100" onClick={() => setIsMenuOpen(!isMenuOpen)}><MoreVertical className="w-5 h-5 text-gray-400" /></Button>
                   <AnimatePresence>
                     {isMenuOpen && (
-                      <>
-                        <div className="fixed inset-0 z-10" onClick={() => setIsMenuOpen(false)}></div>
-                        <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="absolute right-0 mt-2 w-52 bg-white border border-gray-100 shadow-2xl rounded-2xl py-2 z-20 overflow-hidden">
-                          <Link to={`/user/${encodeURIComponent(activeChat.sender)}`} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"><User className="w-4 h-4 text-gray-400" /> View Profile</Link>
-                          <button onClick={handleDeleteConversation} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-400" /> Delete Conversation</button>
-                        </motion.div>
-                      </>
+                      <motion.div initial={{ opacity: 0, scale: 0.95, y: 10 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 10 }} className="absolute right-0 top-full mt-2 w-52 bg-white border border-gray-100 shadow-2xl rounded-2xl py-2 z-[100]">
+                        <Link to={`/user/${encodeURIComponent(activeChat.sender)}`} className="flex items-center gap-3 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50"><User className="w-4 h-4 text-gray-400" /> View Profile</Link>
+                        <button onClick={handleDeleteConversation} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50"><Trash2 className="w-4 h-4 text-red-400" /> Delete Conversation</button>
+                      </motion.div>
                     )}
                   </AnimatePresence>
                 </div>
@@ -579,17 +656,93 @@ export function Chat() {
                                   : `bg-white text-gray-900 ${isConsecutive ? 'rounded-2xl' : 'rounded-2xl rounded-tl-none'} border border-gray-100 font-medium`
                               )}
                             `}>
-                              {m.imageUrl && !m.isDeleted && (
-                                <div className="rounded-xl overflow-hidden mb-2 border border-black/5">
-                                  <img 
-                                    src={m.imageUrl} 
-                                    className="max-h-80 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity" 
-                                    onClick={() => window.open(m.imageUrl, '_blank')} 
-                                    alt="Sent image"
-                                  />
+                              {m.isOrderRequest ? (
+                                <div className="p-1 space-y-3 min-w-[240px]">
+                                  <div className="flex items-center gap-2 border-b border-black/5 pb-2">
+                                    <Banknote className="w-5 h-5 text-emerald-605 animate-pulse" />
+                                    <span className="font-black text-[10px] uppercase tracking-widest text-emerald-605">Meetup Cash Collection</span>
+                                  </div>
+                                  
+                                  <div className="bg-black/5 rounded-xl p-3 space-y-1">
+                                    <h4 className="font-extrabold text-xs text-gray-800">{m.orderProduct?.title || 'Campus Item'}</h4>
+                                    <p className="text-[11px] text-gray-550 font-bold">Price: ₹{m.orderPrice}</p>
+                                  </div>
+
+                                  {/* Statuses */}
+                                  {m.orderStatus === 'pending' ? (
+                                    isMe ? (
+                                      <div className="bg-orange-50 border border-orange-100 rounded-xl p-2.5 text-center">
+                                        <p className="text-[10px] font-bold text-orange-600">Waiting for seller to accept meetup collection...</p>
+                                      </div>
+                                    ) : (
+                                      <div className="space-y-2">
+                                        <div className="flex gap-2">
+                                          <button 
+                                            onClick={() => handleUpdateOrderStatus(m._id, 'accepted')}
+                                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all shadow-sm shadow-emerald-600/10 active:scale-95 cursor-pointer"
+                                          >
+                                            Accept Request
+                                          </button>
+                                          <button 
+                                            onClick={() => handleUpdateOrderStatus(m._id, 'declined')}
+                                            className="bg-gray-100 hover:bg-gray-200 text-gray-650 font-black text-[10px] uppercase tracking-wider px-3 rounded-xl transition-all active:scale-95 cursor-pointer"
+                                          >
+                                            Decline
+                                          </button>
+                                        </div>
+                                      </div>
+                                    )
+                                  ) : m.orderStatus === 'accepted' ? (
+                                    <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-2.5 text-center space-y-0.5">
+                                      <p className="text-[11px] font-black text-emerald-600 uppercase tracking-widest flex items-center justify-center gap-1">
+                                        ✓ Successfully Collected
+                                      </p>
+                                      <p className="text-[9px] text-emerald-600/80 font-bold">Transaction completed via Cash on Delivery</p>
+                                    </div>
+                                  ) : (
+                                    <div className="bg-red-50 border border-red-100 rounded-xl p-2.5 text-center">
+                                      <p className="text-[10px] font-bold text-red-550">✕ Request Declined</p>
+                                    </div>
+                                  )}
                                 </div>
+                              ) : m.isReviewRequest ? (
+                                <div className="p-1 space-y-3 min-w-[240px]">
+                                  <div className="flex items-center gap-2 border-b border-black/5 pb-2">
+                                    <Star className="w-5 h-5 text-amber-500 fill-current animate-pulse shrink-0" />
+                                    <span className="font-black text-[10px] uppercase tracking-widest text-amber-500">Rate & Review Request</span>
+                                  </div>
+                                  
+                                  <div className="bg-black/5 rounded-xl p-3 space-y-1">
+                                    <p className="text-xs font-bold text-gray-800 leading-relaxed">
+                                      Your order has been delivered successfully. Please rate and review this product.
+                                    </p>
+                                  </div>
+
+                                  <Link 
+                                    to={`/dashboard/orders?reviewOrderId=${m.reviewOrderId}`}
+                                    className="block w-full"
+                                  >
+                                    <button className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-wider py-2 rounded-xl transition-all shadow-sm shadow-amber-500/10 active:scale-95 cursor-pointer flex items-center justify-center gap-1.5">
+                                      <Star className="w-3.5 h-3.5 fill-current" />
+                                      Rate Product
+                                    </button>
+                                  </Link>
+                                </div>
+                              ) : (
+                                <>
+                                  {m.imageUrl && !m.isDeleted && (
+                                    <div className="rounded-xl overflow-hidden mb-2 border border-black/5">
+                                      <img 
+                                        src={m.imageUrl} 
+                                        className="max-h-80 w-full object-cover cursor-pointer hover:opacity-95 transition-opacity" 
+                                        onClick={() => window.open(m.imageUrl, '_blank')} 
+                                        alt="Sent image"
+                                      />
+                                    </div>
+                                  )}
+                                  {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
+                                </>
                               )}
-                              {m.content && <p className="whitespace-pre-wrap">{m.content}</p>}
                               
                               <div className={`flex items-center gap-1.5 mt-1 ${isMe ? 'justify-end' : 'justify-start'}`}>
                                 <span className={`text-[9px] font-bold uppercase tracking-tight ${isMe ? 'text-gray-500' : 'text-gray-400'}`}>
@@ -677,7 +830,14 @@ export function Chat() {
                     onClick={() => startNewChat(u)} 
                     className="flex items-center gap-4 p-4 rounded-2xl hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-100 transition-all"
                   >
-                    <img src={getAvatarUrl(u.avatar, u.name)} className="w-12 h-12 rounded-xl object-cover shadow-sm" />
+                    <img 
+                      src={getAvatarUrl(u.avatar, u.name)} 
+                      className="w-12 h-12 rounded-xl object-cover shadow-sm" 
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&background=1B8C50&color=fff`;
+                      }}
+                      alt={u.name}
+                    />
                     <div>
                       <p className="text-sm font-black text-gray-900">{u.name}</p>
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{u.college || 'UniKart Verified'}</p>

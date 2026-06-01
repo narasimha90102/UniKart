@@ -8,16 +8,14 @@ export function MobileNav() {
   const { totalUnreadMessages } = useNotifications();
   
   const navItems = [
-    { name: 'Home', path: '/', icon: Home },
-    { name: 'Search', path: '/dashboard?searchMode=true', icon: Search },
+    { name: 'Home', path: '/dashboard', icon: Home },
     { name: 'Sell', path: '/sell', icon: PlusCircle, highlight: true },
-    { name: 'Chat', path: '/dashboard/chat', icon: MessageCircle, badge: totalUnreadMessages },
     { name: 'Account', path: '/dashboard/profile', icon: User },
   ];
 
   return (
-    <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 px-6 py-2 pb-6 z-[60] shadow-[0_-4px_20px_rgba(0,0,0,0.05)]">
-      <div className="flex items-center justify-between">
+    <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-[280px] bg-white/95 backdrop-blur-md border border-gray-100 rounded-full px-6 py-2.5 z-[60] shadow-[0_12px_40px_rgba(0,0,0,0.12)]">
+      <div className="flex items-center justify-between w-full">
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path || (item.path === '/dashboard/profile' && location.pathname.startsWith('/dashboard') && !location.pathname.includes('/chat') && !location.pathname.includes('/notifications'));

@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { useAuth } from './AuthContext';
+import api from '../utils/api';
+import { TRANSLATIONS } from '../data/translations';
 
 const ThemeContext = createContext();
 
@@ -30,6 +33,7 @@ function applyTheme(theme) {
 }
 
 export function ThemeProvider({ children }) {
+  const { user, setUser } = useAuth();
   const [theme, setThemeState] = useState(() => {
     return localStorage.getItem('unikart_theme') || THEMES.LIGHT;
   });
@@ -37,6 +41,14 @@ export function ThemeProvider({ children }) {
   const [language, setLanguageState] = useState(() => {
     return localStorage.getItem('unikart_language') || 'en';
   });
+
+  // Sync with logged in user's saved language on load or user change
+  useEffect(() => {
+    if (user?.language && user.language !== language) {
+      setLanguageState(user.language);
+      localStorage.setItem('unikart_language', user.language);
+    }
+  }, [user?.language]);
 
   useEffect(() => {
     applyTheme(theme);
@@ -57,17 +69,36 @@ export function ThemeProvider({ children }) {
     applyTheme(t);
   };
 
-  const setLanguage = (code) => {
+  const setLanguage = async (code) => {
     setLanguageState(code);
     localStorage.setItem('unikart_language', code);
+    
+    // Save to user profile database if logged in
+    if (user) {
+      try {
+        const response = await api.put('/users/profile', { language: code });
+        if (response.data?.success) {
+          const updatedUser = { ...user, language: code };
+          setUser(updatedUser);
+          localStorage.setItem('unikart_user', JSON.stringify(updatedUser));
+        }
+      } catch (err) {
+        console.error('Failed to sync language preference with backend:', err);
+      }
+    }
   };
 
   const resolvedTheme = theme === THEMES.SYSTEM ? getSystemTheme() : theme;
   const isDark = resolvedTheme === 'dark';
   const currentLanguage = LANGUAGES.find(l => l.code === language) || LANGUAGES[0];
 
+  const t = (key) => {
+    const dict = TRANSLATIONS[language] || TRANSLATIONS.en;
+    return dict[key] || TRANSLATIONS.en[key] || key;
+  };
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme, isDark, language, setLanguage, currentLanguage, THEMES, LANGUAGES }}>
+    <ThemeContext.Provider value={{ theme, setTheme, isDark, language, setLanguage, currentLanguage, t, THEMES, LANGUAGES }}>
       {children}
     </ThemeContext.Provider>
   );

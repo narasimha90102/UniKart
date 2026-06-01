@@ -10,6 +10,32 @@ import { Input } from '../../components/ui/Input';
 import api from '../../utils/api';
 import { useAuth } from '../../context/AuthContext';
 
+function StudentAvatar({ name, avatar }) {
+  const [error, setError] = useState(false);
+  const initials = name ? name.charAt(0).toUpperCase() : '?';
+
+  if (!avatar || avatar === 'default-avatar.png' || error) {
+    return (
+      <div className="w-16 h-16 rounded-3xl bg-emerald-600 text-white font-black flex items-center justify-center text-2xl uppercase select-none shrink-0 shadow-sm border border-emerald-100">
+        {initials}
+      </div>
+    );
+  }
+
+  const src = avatar.startsWith('http') ? avatar : `/uploads/${avatar}`;
+
+  return (
+    <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center shrink-0 overflow-hidden relative shadow-inner border border-gray-100">
+      <img 
+        src={src} 
+        alt={name} 
+        onError={() => setError(true)} 
+        className="w-full h-full object-cover" 
+      />
+    </div>
+  );
+}
+
 export function AdminPanel() {
   const { user: currentUser, logout } = useAuth();
   const [users, setUsers] = useState([]);
@@ -628,41 +654,51 @@ export function AdminPanel() {
                       animate={{ opacity: 1, y: 0 }}
                       className="bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-md transition-shadow group"
                     >
-                      <div className="flex flex-col md:flex-row justify-between gap-6">
-                        <div className="flex gap-5">
-                          <div className="w-16 h-16 rounded-3xl bg-gray-50 flex items-center justify-center text-2xl font-black text-primary shrink-0">
-                            {u.name?.[0]}
-                          </div>
-                          <div className="space-y-1">
-                            <h3 className="text-xl font-black text-gray-900 leading-none">{u.name}</h3>
-                            <div className="flex flex-wrap gap-x-4 gap-y-1 pt-1">
+                      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
+                        <div className="flex flex-col md:flex-row items-center md:items-center gap-4 md:gap-5 text-center md:text-left w-full min-w-0">
+                          <StudentAvatar name={u.name} avatar={u.avatar} />
+                          <div className="space-y-1.5 md:space-y-1 min-w-0 flex-1 w-full">
+                            <h3 className="text-xl md:text-2xl font-black text-gray-900 leading-tight truncate w-full" title={u.name}>
+                              {u.name}
+                            </h3>
+                            <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-4 gap-y-2 pt-1">
                               <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400">
-                                <MailIcon className="w-3.5 h-3.5" /> {u.email}
+                                <MailIcon className="w-3.5 h-3.5 shrink-0" /> {u.email}
                               </span>
                               <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400">
-                                <Hash className="w-3.5 h-3.5" /> {u.regNo}
+                                <Hash className="w-3.5 h-3.5 shrink-0" /> {u.regNo}
+                              </span>
+                              <span className="flex items-center gap-1.5 text-xs font-bold shrink-0">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider ${
+                                  u.signupMethod === 'google' ? 'bg-blue-50 text-blue-600 border border-blue-100' : 'bg-gray-50 text-gray-500 border border-gray-100'
+                                }`}>
+                                  {u.signupMethod === 'google' ? 'Google' : 'Email'}
+                                </span>
+                              </span>
+                              <span className="flex items-center gap-1.5 text-xs font-bold text-gray-400 shrink-0">
+                                <Clock className="w-3.5 h-3.5 shrink-0" /> Registered: {new Date(u.createdAt).toLocaleDateString()}
                               </span>
                             </div>
                             {u.verifiedAt && (
-                              <span className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-500 uppercase tracking-widest pt-2">
-                                <Clock className="w-3 h-3" /> {u.status === 'approved' ? 'Approved' : 'Actioned'} on {new Date(u.verifiedAt).toLocaleDateString()}
+                              <span className="flex items-center justify-center md:justify-start gap-1.5 text-[10px] font-bold text-emerald-500 uppercase tracking-widest pt-2">
+                                <Clock className="w-3 h-3 shrink-0" /> {u.status === 'approved' ? 'Approved' : 'Actioned'} on {new Date(u.verifiedAt).toLocaleDateString()}
                               </span>
                             )}
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-3 w-full md:w-auto shrink-0 justify-center">
                           {u.status === 'pending_approval' ? (
                             <>
                               <button 
                                 onClick={() => handleVerification(u._id, 'rejected')}
-                                className="flex-1 md:flex-none px-6 h-12 rounded-2xl bg-red-50 text-red-600 font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-colors"
+                                className="flex-1 md:flex-none px-6 h-11 rounded-xl bg-red-50 text-red-600 font-black text-xs uppercase tracking-widest hover:bg-red-100 transition-colors"
                               >
                                 Reject
                               </button>
                               <button 
                                 onClick={() => handleVerification(u._id, 'approved')}
-                                className="flex-1 md:flex-none px-8 h-12 rounded-2xl bg-primary text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+                                className="flex-1 md:flex-none px-8 h-11 rounded-xl bg-primary text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
                               >
                                 Approve
                               </button>
