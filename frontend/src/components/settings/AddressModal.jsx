@@ -13,6 +13,15 @@ const panelVariants = {
 
 const EMPTY_ADDRESS = { label: '', name: '', phone: '', line1: '', line2: '', city: '', pincode: '', type: 'home' };
 
+const Field = ({ label, value, onChange, error, placeholder, type = 'text' }) => (
+  <div className="space-y-1">
+    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>
+    <input type={type} value={value} onChange={onChange} placeholder={placeholder}
+      className={`w-full h-12 px-4 rounded-xl border-2 text-sm font-bold text-gray-900 placeholder-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all ${error ? 'border-red-200' : 'border-gray-100'}`} />
+    {error && <p className="text-[9px] text-red-500 font-bold ml-1">{error}</p>}
+  </div>
+);
+
 function AddressForm({ initial = EMPTY_ADDRESS, onSave, onCancel }) {
   const [form, setForm] = useState(initial);
   const [errors, setErrors] = useState({});
@@ -30,14 +39,7 @@ function AddressForm({ initial = EMPTY_ADDRESS, onSave, onCancel }) {
 
   const set = (k) => (e) => setForm(f => ({ ...f, [k]: e.target.value }));
 
-  const Field = ({ label, field, placeholder, type = 'text' }) => (
-    <div className="space-y-1">
-      <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">{label}</label>
-      <input type={type} value={form[field]} onChange={set(field)} placeholder={placeholder}
-        className={`w-full h-12 px-4 rounded-xl border-2 text-sm font-bold text-gray-900 placeholder-gray-300 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/30 focus:bg-white transition-all ${errors[field] ? 'border-red-200' : 'border-gray-100'}`} />
-      {errors[field] && <p className="text-[9px] text-red-500 font-bold ml-1">{errors[field]}</p>}
-    </div>
-  );
+
 
   return (
     <div className="space-y-4">
@@ -49,13 +51,13 @@ function AddressForm({ initial = EMPTY_ADDRESS, onSave, onCancel }) {
           </button>
         ))}
       </div>
-      <Field label="Full Name" field="name" placeholder="Delivery recipient name" />
-      <Field label="Phone Number" field="phone" placeholder="10-digit mobile number" />
-      <Field label="Address Line 1" field="line1" placeholder="Flat/Room No., Building, Street" />
-      <Field label="Address Line 2 (Optional)" field="line2" placeholder="Hostel name, landmark, etc." />
+      <Field label="Full Name" value={form.name} onChange={set('name')} error={errors.name} placeholder="Delivery recipient name" />
+      <Field label="Phone Number" value={form.phone} onChange={set('phone')} error={errors.phone} placeholder="10-digit mobile number" />
+      <Field label="Address Line 1" value={form.line1} onChange={set('line1')} error={errors.line1} placeholder="Flat/Room No., Building, Street" />
+      <Field label="Address Line 2 (Optional)" value={form.line2} onChange={set('line2')} error={errors.line2} placeholder="Hostel name, landmark, etc." />
       <div className="grid grid-cols-2 gap-3">
-        <Field label="City / Campus" field="city" placeholder="e.g. Coimbatore" />
-        <Field label="Pincode" field="pincode" placeholder="6-digit pincode" />
+        <Field label="City / Campus" value={form.city} onChange={set('city')} error={errors.city} placeholder="e.g. Coimbatore" />
+        <Field label="Pincode" value={form.pincode} onChange={set('pincode')} error={errors.pincode} placeholder="6-digit pincode" />
       </div>
       <div className="flex gap-3 pt-2">
         <button type="button" onClick={onCancel} className="flex-1 h-12 rounded-2xl border-2 border-gray-100 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50">Cancel</button>

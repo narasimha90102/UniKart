@@ -1,11 +1,9 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Home, Search, MessageCircle, PlusCircle, User } from 'lucide-react';
-import { useNotifications } from '../../context/NotificationContext';
 
 export function MobileNav() {
   const location = useLocation();
-  const { totalUnreadMessages } = useNotifications();
   
   const navItems = [
     { name: 'Home', path: '/dashboard', icon: Home },

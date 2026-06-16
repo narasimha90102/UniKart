@@ -63,8 +63,12 @@ export function Login() {
         callback: async (tokenResponse) => {
           if (tokenResponse && tokenResponse.access_token) {
             try {
-              await googleLogin(tokenResponse.access_token, 'login');
-              navigate('/dashboard');
+              const userData = await googleLogin(tokenResponse.access_token, 'login');
+              if (userData && userData.role === 'admin') {
+                navigate('/admin/dashboard');
+              } else {
+                navigate('/dashboard');
+              }
             } catch (err) {
               console.error('Google backend auth error:', err);
               const errorCode = err.response?.data?.code;

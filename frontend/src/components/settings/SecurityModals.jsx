@@ -142,10 +142,20 @@ export function ManageDevicesModal({ onClose }) {
   );
 }
 
+const formatTimeAgo = (d, now) => {
+  const date = new Date(d);
+  const diff = now - date;
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+  if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
+  return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
 /* ─────────────────── Login Activity ─────────────────── */
 export function LoginActivityModal({ onClose }) {
   const [activity, setActivity] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [now] = useState(() => Date.now());
 
   useEffect(() => {
     const fetchActivity = async () => {
@@ -165,15 +175,6 @@ export function LoginActivityModal({ onClose }) {
     };
     fetchActivity();
   }, []);
-
-  const fmt = (d) => {
-    const date = new Date(d);
-    const diff = Date.now() - date;
-    if (diff < 60000) return 'Just now';
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-    if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-    return date.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-  };
 
   return (
     <AnimatePresence>
@@ -220,7 +221,7 @@ export function LoginActivityModal({ onClose }) {
                         <span className={`px-2 py-0.5 rounded-lg text-[9px] font-black uppercase ${a.success ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'}`}>
                           {a.success ? 'Successful' : 'Failed attempt'}
                         </span>
-                        <span className="text-[9px] font-bold text-gray-400 uppercase">{fmt(a.time)}</span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase">{formatTimeAgo(a.time, now)}</span>
                       </div>
                     </div>
                   </div>

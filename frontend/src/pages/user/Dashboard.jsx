@@ -5,6 +5,7 @@ import { Link, Outlet, useLocation, useNavigate, useOutletContext, useSearchPara
 import { useAuth } from '../../context/AuthContext';
 import { useCategories } from '../../hooks/useCategories';
 import { useProducts } from '../../hooks/useProducts';
+import { useNotifications } from '../../context/NotificationContext';
 import { ProductCard } from '../../components/shared/ProductCard';
 import { ProductSkeleton } from '../../components/shared/ProductSkeleton';
 import { Button } from '../../components/ui/Button';
@@ -22,6 +23,7 @@ export function DashboardLayout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [maxPrice, setMaxPrice] = useState(100000);
   const searchInputRef = React.useRef(null);
+  const { totalUnreadMessages } = useNotifications();
 
   // Sync state with URL params
   React.useEffect(() => {
@@ -68,7 +70,7 @@ export function DashboardLayout() {
             </Link>
             <Link
               to="/dashboard/chat"
-              className={`flex items-center gap-2 px-4 lg:px-5 py-1.5 rounded-lg transition-all whitespace-nowrap text-[11px] font-black uppercase tracking-widest ${
+              className={`flex items-center gap-2 px-4 lg:px-5 py-1.5 rounded-lg transition-all whitespace-nowrap text-[11px] font-black uppercase tracking-widest relative ${
                 location.pathname.includes('/chat')
                   ? 'bg-white text-primary shadow-sm'
                   : 'text-gray-500 hover:text-gray-900'
@@ -76,6 +78,11 @@ export function DashboardLayout() {
             >
               <MessageCircle className="w-3.5 h-3.5" />
               Messages
+              {totalUnreadMessages > 0 && (
+                <span className="ml-1 px-1.5 py-0.5 bg-red-500 text-white text-[9px] font-bold rounded-full min-w-[18px] text-center">
+                  {totalUnreadMessages}
+                </span>
+              )}
             </Link>
             <Link
               to="/dashboard/payments"

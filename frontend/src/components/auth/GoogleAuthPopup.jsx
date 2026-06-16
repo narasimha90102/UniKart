@@ -48,13 +48,17 @@ export function GoogleAuthPopup({ isOpen, onClose, onSuccess }) {
   const [selectedAccount, setSelectedAccount] = useState(null);
   const overlayRef = useRef(null);
 
-  // Reset on open
-  useEffect(() => {
-    if (isOpen) {
-      setPhase('select');
-      setSelectedAccount(null);
-    }
-  }, [isOpen]);
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
+
+  // Reset state inline when isOpen transitions from false to true
+  if (isOpen && !prevIsOpen) {
+    setPhase('select');
+    setSelectedAccount(null);
+  }
+  
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
+  }
 
   // Close on Escape
   useEffect(() => {

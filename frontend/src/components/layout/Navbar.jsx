@@ -292,8 +292,13 @@ export function Navbar() {
                     <Link to="/dashboard/wishlist" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 font-medium">
                       <Heart className="w-5 h-5" /> {t('wishlist')}
                     </Link>
-                    <Link to="/dashboard/chat" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 font-medium">
+                    <Link to="/dashboard/chat" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 font-medium relative">
                       <MessageCircle className="w-5 h-5" /> {t('messages')}
+                      {totalUnreadMessages > 0 && (
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                          {totalUnreadMessages}
+                        </span>
+                      )}
                     </Link>
                     <Link to="/dashboard/notifications" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 text-gray-700 font-medium relative">
                       <Bell className="w-5 h-5" /> {t('notifications')}

@@ -29,13 +29,20 @@ const allowedOrigins = [
   'http://10.169.56.55:5173',
   'http://192.168.238.1:5173',
   'http://172.25.163.6:5173',
-  'https://unikart-campus.vercel.app'
-];
+  'https://unikart-campus.vercel.app',
+  'https://unikart-app.loca.lt',
+  process.env.CLIENT_URL,
+].filter(Boolean);
 
-// Add production frontend URL if set
-if (process.env.FRONTEND_URL) {
-  allowedOrigins.push(process.env.FRONTEND_URL);
-}
+// In production with tunnel, allow all origins temporarily
+const corsOrigin = (origin, callback) => {
+  if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.loca.lt') || origin.includes('localhost')) {
+    callback(null, true);
+  } else {
+    callback(null, true); // Allow all for local dev tunnel access
+  }
+};
+
 
 // Socket.io Setup
 const io = new Server(server, {
@@ -66,7 +73,7 @@ app.use(helmet({ crossOriginResourcePolicy: false }));
 
 // Enable CORS
 app.use(cors({
-  origin: allowedOrigins,
+  origin: corsOrigin,
   credentials: true
 }));
 
@@ -123,7 +130,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 

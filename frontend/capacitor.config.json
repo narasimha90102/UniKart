@@ -1,5 +1,9 @@
 {
   "appId": "com.unikart.app",
   "appName": "UniKart",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "url": "https://lucky-eagle-23.loca.lt",
+    "cleartext": true
+  }
 }
