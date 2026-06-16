@@ -55,6 +55,8 @@ const io = new Server(server, {
   pingInterval: 25000,
 });
 
+app.set('io', io);
+
 require('./config/socket')(io); // Mount socket logic
 
 // Body parser

@@ -268,3 +268,51 @@ exports.updateOrderRequest = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Send a message via HTTP POST (fallback/mobile)
+// @route   POST /api/chat/send
+// @access  Private
+exports.sendMessage = async (req, res, next) => {
+  try {
+    const senderId = req.user.id;
+    const { receiverId, content, imageUrl, isOrderRequest, orderProduct, orderPrice } = req.body;
+
+    if (!receiverId) {
+      return res.status(400).json({ success: false, message: 'Receiver ID is required' });
+    }
+
+    const message = await Message.create({
+      sender: senderId,
+      receiver: receiverId,
+      content: content || '',
+      imageUrl: imageUrl || null,
+      isOrderRequest: isOrderRequest || false,
+      orderProduct: orderProduct || null,
+      orderPrice: orderPrice || null
+    });
+
+    const room = [senderId, receiverId].sort().join('-');
+    const io = req.app.get('io');
+    if (io) {
+      const payload = {
+        _id: message._id,
+        senderId,
+        receiverId,
+        content: message.content,
+        imageUrl: message.imageUrl,
+        room,
+        read: false,
+        createdAt: message.createdAt,
+        isOrderRequest: message.isOrderRequest || false,
+        orderProduct: message.orderProduct || null,
+        orderPrice: message.orderPrice || null,
+        orderStatus: message.orderStatus || 'pending'
+      };
+      io.to(room).emit('receive_message', payload);
+    }
+
+    res.status(201).json({ success: true, data: message });
+  } catch (error) {
+    next(error);
+  }
+};

@@ -6,7 +6,8 @@ const {
   getUnreadCount,
   deleteMessage,
   deleteConversation,
-  updateOrderRequest
+  updateOrderRequest,
+  sendMessage
 } = require('../controllers/chatController');
 const { protect } = require('../middleware/auth');
 
@@ -14,6 +15,7 @@ const router = express.Router();
 
 router.use(protect);
 
+router.post('/send', sendMessage);
 router.get('/conversations', getConversations);
 router.get('/history/:room', getHistory);
 router.get('/unread-count', getUnreadCount);
