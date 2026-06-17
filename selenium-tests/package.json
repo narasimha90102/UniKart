@@ -1,0 +1,15 @@
+{
+  "name": "unikart-selenium-tests",
+  "version": "1.0.0",
+  "description": "Selenium end-to-end testing suite for UniKart Web Application",
+  "main": "webE2E.test.js",
+  "scripts": {
+    "test": "node webE2E.test.js",
+    "consolidate": "node consolidateReports.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "selenium-webdriver": "^4.22.0"
+  }
+}
