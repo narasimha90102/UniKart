@@ -1,23 +1,23 @@
-# UniKart Android Application - Appium E2E Testing Suite
+# UniKart Android Application - Appium E2E Testing Suite (Python)
 
-This repository hosts the automated, end-to-end (E2E) testing suite for the UniKart Android mobile application. It automates key flows on a mobile emulator (signup validation, login, feed scrolling, item search, sell posting, and logout) and outputs styled reports in Microsoft Excel format.
+This repository hosts the automated, end-to-end (E2E) testing suite for the UniKart Android mobile application, implemented in Python. It automates key user flows on a mobile emulator (registration verification, customer login, home feed scrolling, search, product listing creation, and logout verification) and outputs styled Excel reports.
 
 ## Tech Stack
-- **Node.js**
-- **WebdriverIO** (Modern Appium client)
+- **Python** (v3.8 or higher)
+- **Appium Python Client** (Python client interface for Appium)
 - **Appium Server** (Mobile automation server)
-- **ExcelJS** (Excel report generation)
+- **openpyxl** (Excel report generation library)
 
 ---
 
 ## Setup Instructions
 
-Running mobile E2E tests requires configuring the Android emulator environment.
+Running mobile E2E tests requires configuring the Android emulator and Appium environment.
 
 ### 1. Prerequisites
-- **Node.js** (v18 or higher)
+- **Python** (v3.8 or higher)
 - **Java Development Kit (JDK)** (v17 or higher)
-- **Android Studio** & **Android SDK** configured with `ANDROID_HOME` environment variable.
+- **Android Studio** & **Android SDK** configured with the `ANDROID_HOME` environment variable.
 - A running **Android Emulator** or physical Android device connected via ADB.
 - Appium Server installed globally:
   ```bash
@@ -29,7 +29,7 @@ Running mobile E2E tests requires configuring the Android emulator environment.
   ```
 
 ### 2. Compile the Mobile App APK
-To test the app, you need to compile it into an APK file.
+To test the app, compile it into an APK file.
 Run the following in the `unikart-mobile` folder:
 ```bash
 cd unikart-mobile
@@ -40,11 +40,20 @@ cd unikart-mobile
 Verify that the APK file is successfully generated at:
 `unikart-mobile/android/app/build/outputs/apk/debug/app-debug.apk`
 
-### 3. Install Test Dependencies
+### 3. Install Python Dependencies
 Navigate to the `appium-tests` directory and install the requirements:
 ```bash
 cd appium-tests
-npm install
+
+# (Optional but recommended) Set up virtual environment
+python -m venv venv
+# On Windows PowerShell
+.\venv\Scripts\activate
+# On Linux/macOS
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
 ```
 
 ### 4. Database Seeding
@@ -71,19 +80,30 @@ adb devices
 ```
 
 ### Step C: Execute Tests
-Run the test runner script:
+
+#### Running in Dry Run Mode (105 Tests)
+Simulates test execution and produces a detailed Excel report immediately (no emulator or Appium server required):
 ```bash
-npm test
+# On Windows PowerShell
+$env:DRY_RUN="true"
+python mobile_e2e_test.py
 ```
 
-The automation will:
-1. Launch the UniKart app on your emulator.
-2. **Registration Checks:** Navigate to sign up, confirm fields, and return.
-3. **Login Flow:** Log in as `testuser@unikart.com` / `TestPassword123!`.
-4. **Scrolling Home Feed:** Perform swipe gestures to scroll through listings.
-5. **Product Search:** Navigate to Search and filter items.
-6. **Sell Listing:** Navigate to Sell page, enter item info, and list a product.
-7. **Logout Flow:** Open Profile and log out.
+#### Running in Live Mode
+Executes the live Appium tests on the emulator:
+```bash
+# On Windows PowerShell
+$env:DRY_RUN="false"
+python mobile_e2e_test.py
+```
+
+The automation will execute:
+1. **Verify Register Screen Fields:** Navigate to sign up, confirm fields, and return.
+2. **Mobile Login Flow:** Log in as `testuser@unikart.com` / `TestPassword123!`.
+3. **Verify Product Listings Feed:** Perform swipe gestures to scroll through listings.
+4. **Mobile Product Search:** Navigate to Search and filter items.
+5. **Mobile Create Listing Flow:** Navigate to Sell page, enter item details, and list a product.
+6. **Logout Verification:** Open Profile and log out.
 
 ---
 
@@ -92,4 +112,4 @@ After execution, a reports folder is automatically generated:
 - File location: `./reports/mobile_test_report.xlsx`
 - Failure states will capture screen dumps at: `./reports/failure_MOB-TC-XXX.png`
 
-The report structure matches the Web E2E report, highlighting pass/fail counts, execution timings, and detailed stack-traces for failing elements.
+The report structure highlights pass/fail counts, execution timings, and detailed stack-traces for failing elements.

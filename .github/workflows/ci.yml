@@ -107,10 +107,15 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
       - name: Install Test Dependencies
         run: |
           npm install --prefix selenium-tests
-          npm install --prefix appium-tests
+          pip install -r appium-tests/requirements.txt
 
       - name: Run Selenium E2E Web + API Tests (100 Tests)
         env:
@@ -122,7 +127,7 @@ jobs:
         env:
           DRY_RUN: 'true'
         run: |
-          npm run test --prefix appium-tests
+          python appium-tests/mobile_e2e_test.py
 
       - name: Generate LifeLink_Test_Report.xlsx
         run: |
