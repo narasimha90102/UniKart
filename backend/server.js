@@ -66,7 +66,7 @@ app.use(express.json());
 app.use(compression());
 
 // Dev logging middleware
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && process.env.LOAD_TESTING !== 'true') {
   app.use(morgan('dev'));
 }
 
@@ -80,7 +80,7 @@ app.use(cors({
 }));
 
 // Rate limiting (enabled in production)
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === 'production' && process.env.LOAD_TESTING !== 'true') {
   const limiter = rateLimit({
     windowMs: 10 * 60 * 1000, // 10 mins
     max: 200 // 200 requests per 10 mins
